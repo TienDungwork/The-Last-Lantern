@@ -32,7 +32,7 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
 ## Phần B — xong
 
 - Hộp đẩy/kéo; cầm đèn lồng/đèn pin/nến; cảm biến sáng (28); hẹn giờ (24); hồi năng lượng (25); thông báo nhặt đồ.
-- `LightLevel` = port đúng `method_132` (bỏ xấp xỉ cũ ở is_lit).
+- `GridState.light_level` = port đúng `method_132` (bỏ xấp xỉ cũ ở is_lit).
 - Parity: `level00_box`, `level00_flashlight`, `level06_candle` (so cả số câu thoại mỗi bước với số lần phải đóng thoại ở bản gốc).
 
 ## Phần C — còn lại (thứ tự làm)
