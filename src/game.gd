@@ -26,6 +26,7 @@ var hud: Hud
 var menu: Menu
 var _say_queue: Array = []
 var _reload_after_dialog := false
+var _menu_in_game := false    # menu mở từ trong màn (không phải màn tiêu đề)
 var _pending_level := {}       # change_level chờ đóng hết thoại rồi mới chuyển
 var _held: Array = []        # phím hướng đang giữ, phím nhấn sau cùng ở cuối (được ưu tiên)
 var _step_wait := 0.0        # giây còn lại trước khi được đi ô tiếp theo
@@ -78,6 +79,7 @@ func _ready() -> void:
 
 ## Màn tiêu đề: màn 0 làm nền phía sau (không chạy thoại mở đầu), menu phủ lên.
 func _to_title() -> void:
+	_menu_in_game = false
 	world = World.new()
 	load_level(0)
 	_say_queue.clear()
@@ -99,6 +101,11 @@ func _continue_game() -> void:
 func _on_menu_visibility() -> void:
 	if not menu.visible and state != null:
 		_refresh_light()
+	if not menu.visible and _menu_in_game:   # field_434: đóng menu trong game -> chạy lại sự kiện cờ 128 ở ô đang đứng
+		_menu_in_game = false
+		var out := state.enter().duplicate()
+		state.out.clear()
+		_handle(out)
 
 ## Kiểu B: vẽ cảnh 3D ở 1/PIXEL_SCALE độ phân giải rồi phóng nguyên lần bằng nearest, pixel sắc và đều.
 ## UI vẫn vẽ ở độ phân giải đầy đủ. Trả về node chứa cảnh 3D.
@@ -262,8 +269,10 @@ func _unhandled_input(ev: InputEvent) -> void:
 		state.out.clear()
 		_handle(out)
 	elif ev.is_action_pressed("menu"):
+		_menu_in_game = true
 		menu.open_pause()
 	elif ev.is_action_pressed("inventory"):
+		_menu_in_game = true
 		menu.open_inventory(menu._close)
 
 func _handle(out: Array) -> void:

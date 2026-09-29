@@ -55,7 +55,7 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
    - Boss 2 (SPECIAL 10/11/12, `method_199/200`, màn 14): trôi sang phải, đèn trước mặt làm nó mất 1/4 máu và tắt,
      ai ở bên trái nó hoặc chạm cục lửa (SPECIAL 11) thì chết ngay; hết máu -> SPECIAL 12.
 4. Nhạc (op 1, MIDI→OGG), kết chương (op 13), minigame (op 12), special (op 30).
-5. Bản đồ thành phố, menu, ~~lưu game~~. Lưu xong: JSON `user://save.json` (`World.save_game/load_game`), tự lưu
-   khi vào màn 14, khi TELEPORT lúc đang ở màn 14 và SPECIAL 18; `game.continue_from_save()` chờ menu "Chơi tiếp".
-   Trang bị tạm bằng phím Tab (xoay vòng túi đồ) cho tới khi có màn hình túi đồ. Op 27 (mũi tên/nháy HUD) xong.
+5. Bản đồ thành phố, ~~menu~~, ~~lưu game~~. Lưu: JSON `user://save.json` (`World.save_game/load_game`), tự lưu
+   khi vào màn 14, khi TELEPORT lúc đang ở màn 14 và SPECIAL 18. Menu (`src/ui/menu.gd`): tiêu đề (Chơi tiếp dùng
+   save), tạm dừng Esc, cài đặt, túi đồ lưới Tab/I để trang bị. Op 27 (mũi tên/nháy HUD) xong.
 6. Parity route cho mỗi màn (`tools/record_parity.ps1`), kèm một route qua bàn đạp.
