@@ -54,6 +54,7 @@ var boss: Dictionary = {}
 var boss2: Dictionary = {}
 var fireballs: Array = []        # Vector2i, cục lửa đứng yên (SPECIAL 11)
 var pointers: Dictionary = {}    # op 27, slot -> {at, dir} (mũi tên) | {hud} (nháy HUD); mất khi vào màn
+var forced: Dictionary = {}      # op 8: {dir, n} còn phải ép đi; trong lúc này bỏ qua phím
 var sun_beam: Dictionary = {}    # SPECIAL 0/1/3 (field_334/335/336): {n: số tia 1|2, at: ô gốc}; mất khi vào màn
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
@@ -186,8 +187,22 @@ func enter() -> Array:
 func step(dir: int) -> Array:
 	## Một lượt đi. Bị chắn: chạy sự kiện ô đích có lọc hướng. Đi được: chạy sự kiện ô mới, không lọc hướng.
 	out.clear()
-	if not control:
+	if not control or not forced.is_empty():
 		return out
+	return _step(dir)
+
+func forced_step() -> Array:
+	## Op 8 (field_141/142/143): kịch bản ép đi từng ô như tự đi (sự kiện ô vẫn chạy), kể cả khi khóa điều khiển.
+	out.clear()
+	if forced.is_empty():
+		return out
+	var dir: int = forced.dir
+	forced.n -= 1
+	if forced.n <= 0:
+		forced = {}
+	return _step(dir)
+
+func _step(dir: int) -> Array:
 	if carried >= 0 and dir != facing and int(lights[carried].type) == 1:
 		# Cầm đèn pin: đổi hướng chỉ xoay đèn, không bước.
 		facing = dir

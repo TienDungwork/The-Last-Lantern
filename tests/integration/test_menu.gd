@@ -16,8 +16,9 @@ func test_title_new_game_inventory_pause() -> void:
 	eq([game.music_track, game.music.stream != null], [game.TITLE_MUSIC, true], "nhạc tiêu đề")
 	game.menu._start(game.menu.new_game)
 	ok(not game.menu.visible and game.hud.visible, "trò chơi mới: vào màn")
-	eq(game.state.level.index, 0, "màn 0")
-	eq(game.music_track, game.LEVEL_MUSIC[0], "nhạc màn 0")
+	eq(game.state.level.index, 16, "màn mở đầu 16")
+	ok(game._cutscene.visible, "cảnh cắt Năm năm trước")
+	eq(game.music_track, game.LEVEL_MUSIC[16], "nhạc màn 16")
 
 	game.world.inventory.append(20)
 	game.menu.world = game.world
@@ -37,6 +38,9 @@ func test_title_new_game_inventory_pause() -> void:
 
 	# Sự kiện cờ 128 (lặp) ở ô đang đứng chạy lại khi đóng menu trong game (field_434).
 	var s: GridState = game.state
+	s.player = Vector2i(8, 5)   # ra khỏi ô mở đầu (10,5), nơi cờ 128 sẽ chiếu lại cảnh cắt
+	game.dialog.hide()
+	game._say_queue.clear()
 	s.events.append({"id": s.event_active.size(), "x": s.player.x, "y": s.player.y, "w": 1, "h": 1,
 		"flags": GridState.F_ACTIVE | GridState.F_ON_ENTER | GridState.F_REPEAT, "commands": [{"op": 25, "args": []}]})
 	s.event_active.append(true)

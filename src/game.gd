@@ -12,6 +12,7 @@ const SAVE_PATH := "user://save.json"
 # class_4.field_38 (nhạc mỗi màn, tài nguyên 54..60 = track 0..6); -1 = giữ nhạc đang phát (-123 ở bản gốc).
 const LEVEL_MUSIC := [6, 5, 4, 6, 2, 2, 0, 6, 0, 5, 5, 0, 6, 4, 2, 2, 6, 5, 0, 0, 0, -1]
 const TITLE_MUSIC := 4   # tài nguyên 58
+const NEW_GAME_LEVEL := 16   # class_4 case 14: đoạn mở đầu "Năm năm trước...", tự đi rồi dịch chuyển sang màn 0
 const PIXEL_SCALE := 2   # kiểu B: 1 pixel cảnh = 2x2 pixel cửa sổ (1280x720 -> cảnh 640x360)
 
 @export var start_level := 0
@@ -118,7 +119,7 @@ func play_music(track: int) -> void:
 func _new_game() -> void:
 	hud.show()
 	world = World.new()
-	load_level(0)
+	load_level(NEW_GAME_LEVEL)
 
 func _continue_game() -> void:
 	hud.show()
@@ -208,7 +209,10 @@ func _process(delta: float) -> void:
 			_held.append(action)
 		elif not Input.is_action_pressed(action):
 			_held.erase(action)
-	if _step_wait == 0.0 and not _held.is_empty():
+	if _step_wait == 0.0 and not state.forced.is_empty():
+		state.forced_step()
+		_step_wait = ActorView.STEP_TIME
+	elif _step_wait == 0.0 and not _held.is_empty():
 		state.step(DIR_ACTION[_held.back()])   # step() xóa out cũ trước khi ghi
 		_step_wait = ActorView.STEP_TIME
 	rules.tick(int(delta * 1000.0))

@@ -72,16 +72,15 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 				st.out.append({"type": "change_level", "level": int(a[2]), "to": to})
 		7:
 			st.control = int(a[0]) != 0
-		8:
+		8:   # method_209 case 8: kịch bản chạy tiếp ngay, người chơi đi dần qua GridState.forced_step()
 			var dir := int(a[0])
-			if GridState.DIR_VEC.has(dir):
-				for i in int(a[1]):
-					var t: Vector2i = st.player + GridState.DIR_VEC[dir]
-					if st.is_solid(t):
-						break
-					st.player = t
-					st.facing = dir
-					st.out.append({"type": "moved", "to": t, "dir": dir, "scripted": true})
+			if dir == 5:
+				st.world.equipped = -1   # field_274 = -1: cất món đang cầm
+			elif GridState.DIR_VEC.has(dir) and int(a[1]) <= 0:
+				st.facing = dir
+				st.out.append({"type": "bumped", "dir": dir})   # chỉ quay mặt
+			elif GridState.DIR_VEC.has(dir):
+				st.forced = {"dir": dir, "n": int(a[1])}
 		9:
 			var at := Vector2i(int(a[0]), int(a[1]))
 			if _level_arg(int(a[2]), World.SET_TILE, 0, at.x, at.y, int(a[3])):

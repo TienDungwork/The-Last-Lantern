@@ -27,11 +27,33 @@ func test_say_without_portrait() -> void:
 	eq(s.out[0].portrait, -1, "255,255 = không chân dung")
 
 func test_player_control_and_move() -> void:
-	# event#4 (9..10,1): control off, SAY 9, MOVE right 1, control on
-	var s := GridState.new(LevelData.load_level(0), Vector2i(9, 1))
-	s.vm.run(s.level.events[4])
-	eq(s.player, Vector2i(10, 1), "kịch bản đẩy sang phải 1")
-	eq(s.control, true, "trả lại điều khiển")
+	# event#4 (9..10,1): control off, SAY 9, MOVE right 1, control on = đi vào vùng tối thì bị đẩy lùi
+	var s := GridState.new(LevelData.load_level(0), Vector2i(11, 1))
+	s.step(3)
+	eq([s.player, s.forced, s.control], [Vector2i(10, 1), {"dir": 1, "n": 1}, true], "kịch bản chạy hết, chờ ép đi")
+	s.step(3)
+	eq(s.player, Vector2i(10, 1), "đang bị ép đi: bỏ qua phím")
+	s.forced_step()
+	eq([s.player, s.forced], [Vector2i(11, 1), {}], "bị đẩy lùi 1 ô")
+
+func test_intro_level16_walks_into_level0() -> void:
+	# Trò chơi mới = màn 16 (class_4 case 14). Chuỗi ép đi 16#17 -> #12 -> #13 -> #14, hẹn giờ #9, #10, rồi #11
+	# dịch chuyển sang màn 0 (6,4). Op 8 phải kích sự kiện ở từng ô đi qua, không thì kẹt ở (7,5).
+	var s := World.new().enter_level(16)
+	var rules := RulesClassic.new(s)
+	var all: Array = s.enter().duplicate()
+	for i in 600:
+		all.append_array(s.forced_step().duplicate())
+		s.out.clear()
+		rules.tick(100)
+		all.append_array(s.out.duplicate())
+		s.out.clear()
+		if all.any(func(o): return o.type in ["change_level", "death"]):
+			break
+	var last: Dictionary = all.filter(func(o): return o.type in ["change_level", "death"]).back()
+	eq([last.type, last.get("level"), last.get("to")], ["change_level", 0, Vector2i(6, 4)], "sang màn 0")
+	eq(all.filter(func(o): return o.type == "say").map(func(o): return o.text_id), [171, 172, 173, 174, 0, 1, 2, 3],
+		"cảnh cắt 4 câu, Hale cãi dân làng, chủ quán, ngất đi")
 
 func test_if_holding_aborts() -> void:
 	var s := GridState.new(LevelData.load_level(0))
@@ -152,7 +174,7 @@ func test_cutscene_intro_then_continues() -> void:
 	var seq := s.out.filter(func(o): return o.type in ["cutscene", "say", "cutscene_end"]).map(
 		func(o): return o.get("frame", o.get("text_id", "end")))
 	eq(seq, [181, 171, 172, 173, 174, "end"], "tranh, 4 câu, gỡ")
-	eq([s.control, s.player], [false, Vector2i(7, 5)], "lệnh sau op 13 vẫn chạy")
+	eq([s.control, s.forced], [false, {"dir": 3, "n": 3}], "lệnh sau op 13 vẫn chạy")
 
 func test_tutorial_pointers_in_order() -> void:
 	# Op 27 (method_219): mode 1 = mũi tên ở ô (x,y) chỉ hướng dir, mode 2 = nháy khung HUD số n, mode 0 = tắt.
