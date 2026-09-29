@@ -99,6 +99,44 @@ func test_pressure_plate_opens_and_closes_door() -> void:
 	s.step(4)
 	eq(s.tiles[9][13], 0x52, "rời bàn đạp: cửa đóng")
 
+func test_box_extracted_from_grid() -> void:
+	var s := GridState.new(LevelData.load_level(0))
+	eq(s.boxes, {Vector2i(16, 8): 67}, "màn 0 có một hộp ở (16,8)")
+	eq(s.tiles[8][16], 0, "ô dưới hộp là sàn")
+
+func test_push_box_onto_plate_opens_door() -> void:
+	# Đẩy hộp (16,8) sang trái hai lần: hộp nằm trên bàn đạp (14,8), cửa (13,9) mở và giữ mở khi người đi.
+	var s := GridState.new(LevelData.load_level(0), Vector2i(17, 8))
+	s.step(3)
+	eq(s.out[0], {"type": "box_moved", "from": Vector2i(16, 8), "to": Vector2i(15, 8)}, "đẩy lần 1")
+	eq(s.player, Vector2i(16, 8), "người vào chỗ hộp cũ")
+	s.step(3)
+	ok(s.boxes.has(Vector2i(14, 8)), "hộp trên bàn đạp")
+	eq(s.tiles[9][13], 0, "cửa mở")
+	s.step(1)
+	eq(s.tiles[9][13], 0, "người đi, hộp vẫn đè: cửa mở")
+
+func test_push_blocked_becomes_pull() -> void:
+	# Hộp sát tường: đẩy vào thì người lùi một ô và kéo hộp theo.
+	var s := GridState.new(LevelData.load_level(0), Vector2i(16, 8))
+	s.boxes = {Vector2i(15, 8): 67}
+	s.set_tile(Vector2i(14, 8), 0x38)
+	s.step(3)
+	eq(s.boxes.keys(), [Vector2i(16, 8)], "hộp vào chỗ người đứng")
+	eq(s.player, Vector2i(17, 8), "người lùi một ô")
+	eq(s.facing, 3, "vẫn quay mặt về hộp")
+	s.set_tile(Vector2i(15, 8), 0x38)
+	s.step(3)   # trước hộp là tường, sau lưng (18,8) là tường: kẹt, không ai nhúc nhích
+	eq(s.player, Vector2i(17, 8), "kẹt: người đứng yên")
+	eq(s.boxes.keys(), [Vector2i(16, 8)], "kẹt: hộp đứng yên")
+
+func test_box_blocks_light() -> void:
+	var s := GridState.new(LevelData.load_level(0))
+	var before: Array = s.light_map().duplicate(true)
+	s.boxes.clear()
+	s.light = []
+	ok(s.light_map() != before, "bỏ hộp thì bản đồ sáng đổi")
+
 class _CountingVM extends ScriptVM:
 	var runs := 0
 	func run(e: Dictionary) -> bool:

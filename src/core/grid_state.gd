@@ -22,6 +22,7 @@ var lights: Array = []           # bản sao có thể đổi của level.lights
 var events: Array = []           # bản sao sâu của level.events (COUNTER sửa số đếm trong đó)
 var event_active: Array = []     # bool theo event id
 var plate_saved: Dictionary = {} # event id bàn đạp đang mở -> ô cửa gốc
+var boxes: Dictionary = {}       # Vector2i -> ô hộp; tách khỏi lưới lúc nạp (field_204..206)
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2
@@ -43,6 +44,12 @@ func _init(L: LevelData, spawn: Vector2i = Vector2i(-1, -1), w: World = null) ->
 	world = w if w else World.new()
 	for row in L.grid:
 		tiles.append(PackedInt32Array(row))
+	for y in L.height:
+		for x in L.width:
+			var t: int = tiles[y][x]
+			if t >= 8 and int(LevelData.tile_props(t).movable) == 1:
+				boxes[Vector2i(x, y)] = t
+				tiles[y][x] = 0
 	for l in L.lights:
 		lights.append(l.duplicate())
 	events = L.events.duplicate(true)
@@ -65,6 +72,11 @@ func set_tile(p: Vector2i, t: int) -> void:
 func is_solid(p: Vector2i) -> bool:
 	var t := tile_at(p)
 	return t >= 8 and int(LevelData.tile_props(t).solid) == 1
+
+func is_blocked(p: Vector2i) -> bool:
+	## method_93: ngoài bản đồ, có hộp, hoặc ô solid. Người chơi không tính (kéo hộp vào chỗ mình đứng).
+	# ponytail: bản gốc còn chặn ở ô actor (field_379..382); thêm khi có actor.
+	return not in_bounds(p) or boxes.has(p) or is_solid(p)
 
 func light_map() -> Array:
 	if light.is_empty():
@@ -118,7 +130,21 @@ func step(dir: int) -> Array:
 	if not control:
 		return out
 	facing = dir
-	var target: Vector2i = player + DIR_VEC[dir]
+	var d: Vector2i = DIR_VEC[dir]
+	var target: Vector2i = player + d
+	if boxes.has(target):
+		# method_92: đẩy hộp; phía sau hộp bị chặn thì thành kéo (lùi một ô, hộp vào chỗ cũ).
+		var box_from := target
+		var box_to := target + d
+		if is_blocked(box_to):
+			box_to = player
+			target = player - d
+			if is_blocked(target):
+				return out
+		boxes[box_to] = boxes[box_from]
+		boxes.erase(box_from)
+		light = []
+		out.append({"type": "box_moved", "from": box_from, "to": box_to})
 	if is_solid(target):
 		out.append({"type": "bumped", "dir": dir})
 		for e in events_at(target, dir):
@@ -140,17 +166,23 @@ func update_plates() -> void:
 			continue
 		var rect := Rect2i(int(e.x), int(e.y), int(e.w), int(e.h))
 		var door := Vector2i(int(e.commands[0].args[0]), int(e.commands[0].args[1]))
-		var pressed := rect.has_point(player) or (plate_saved.has(id) and player == door)
+		var pressed := rect.has_point(player)
 		for y in range(rect.position.y, rect.end.y):
 			for x in range(rect.position.x, rect.end.x):
-				if in_bounds(Vector2i(x, y)) and tile_at(Vector2i(x, y)) >= 8:
+				var q := Vector2i(x, y)
+				if in_bounds(q) and (tile_at(q) >= 8 or boxes.has(q)):
 					pressed = true
 		for L in lights:
 			if rect.has_point(Vector2i(int(L.x), int(L.y))):
 				pressed = true
+			if int(L.x) == door.x and int(L.y) == door.y:
+				pressed = true   # đèn chặn cửa: không đóng được
+		if boxes.has(door):
+			pressed = true
 		if pressed and not plate_saved.has(id):
 			plate_saved[id] = tile_at(door)
 			set_tile(door, 0)
+			vm.run(e)   # method_207: chạy lệnh sau op 16 (nếu có)
 		elif not pressed and plate_saved.has(id):
 			set_tile(door, plate_saved[id])
 			plate_saved.erase(id)

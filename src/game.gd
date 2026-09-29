@@ -104,6 +104,8 @@ func _handle(out: Array) -> void:
 				actor.snap_to(o.to)
 			"say":
 				_say_queue.append(o)
+			"box_moved":
+				builder.move_box(o.from, o.to)
 			"tile_changed":
 				builder.rebuild_tile(state, o.at)
 			"change_level":

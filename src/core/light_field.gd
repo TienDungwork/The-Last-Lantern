@@ -87,11 +87,12 @@ static func _ray(s: GridState, ty: int, tx: int, ly: int, lx: int, dir: int, rng
 			continue   # bỏ ô của chính đèn (đèn treo trên vật thể)
 		var t := s.tile_at(Vector2i(col, row))
 		if t < 8:
+			t = s.boxes.get(Vector2i(col, row), 0)
+		if t < 8:
 			continue
 		var p := LevelData.tile_props(t)
 		if int(p.blocks_light) == 1:
 			return BLOCKED
 		if int(p.dim_light) == 1 and absi(py - ty) <= 1 and absi(px - tx) <= 1:
 			return DIMMED
-	# ponytail: bản gốc còn xét diễn viên/hộp đang mang (method_117) trên đường tia; M2 thêm khi có actor.
 	return dy + dx * 40 / 100 if dy > dx else dx + dy * 40 / 100
