@@ -27,7 +27,8 @@ var _reload_after_dialog := false
 var _pending_level := {}       # change_level chờ đóng hết thoại rồi mới chuyển
 var _held: Array = []        # phím hướng đang giữ, phím nhấn sau cùng ở cuối (được ưu tiên)
 var _step_wait := 0.0        # giây còn lại trước khi được đi ô tiếp theo
-var _guard_views: Dictionary = {}   # slot tu sĩ -> ActorView
+var _guard_views: Dictionary = {}     # slot tu sĩ -> ActorView
+var _creature_views: Dictionary = {}  # slot sinh vật -> ActorView
 
 func _ready() -> void:
 	_setup_input()
@@ -84,9 +85,10 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 	rules = RulesClassic.new(state, randi())
 	builder.build(state)
 	actor.snap_to(state.player)
-	for v in _guard_views.values():
-		v.queue_free()
-	_guard_views.clear()
+	for views in [_guard_views, _creature_views]:
+		for v in views.values():
+			v.queue_free()
+		views.clear()
 	var out := state.enter().duplicate()
 	state.out.clear()
 	_handle(out)
@@ -112,32 +114,51 @@ func _process(delta: float) -> void:
 		state.step(DIR_ACTION[_held.back()])   # step() xóa out cũ trước khi ghi
 		_step_wait = ActorView.STEP_TIME
 	rules.tick(int(delta * 1000.0))
-	_sync_guards()
+	_sync_entities()
 	if not state.out.is_empty():
 		var out := state.out.duplicate()
 		state.out.clear()
 		_handle(out)
 
-## Tu sĩ đi liên tục theo ms trong core; view chỉ chép vị trí mỗi khung hình.
-func _sync_guards() -> void:
-	for i in state.guards.size():
-		var g = state.guards[i]
-		if g == null:
-			if _guard_views.has(i):
-				_guard_views[i].queue_free()
-				_guard_views.erase(i)
+## Tu sĩ và sinh vật đi liên tục theo ms trong core; view chỉ chép vị trí mỗi khung hình.
+func _sync_entities() -> void:
+	_sync_list(state.guards, _guard_views, GridState.GUARD_TILE_MS, _guard_view)
+	_sync_list(state.creatures, _creature_views, GridState.CREATURE_TILE_MS, _creature_view)
+	for i in _creature_views:   # đang chết: mờ dần trong 1 s
+		var c = state.creatures[i]
+		var spr := _creature_views[i].get_child(0) as Sprite3D
+		spr.modulate.a = 1.0 - c.timer / 1000.0 if c.state == GridState.C_DYING else 1.0
+
+func _sync_list(list: Array, views: Dictionary, unit: int, make: Callable) -> void:
+	for i in list.size():
+		var e = list[i]
+		if e == null:
+			if views.has(i):
+				views[i].queue_free()
+				views.erase(i)
 			continue
-		if not _guard_views.has(i):
-			var v := ActorView.new()
-			if LevelBuilder.art == "B":
-				var spr := LevelBuilder.sprite("ak_00")
-				spr.modulate = Color(1.0, 0.35, 0.3)   # ponytail: chưa có sprite tu sĩ áo đỏ, tô đỏ tạm ông lão ak_00
-				v.add_child(spr)
-			builder.get_parent().add_child(v)
-			_guard_views[i] = v
-		var view: ActorView = _guard_views[i]
-		view.position = Vector3(g.pos.x, 0, g.pos.y) / float(GridState.GUARD_TILE_MS) * LevelBuilder.TILE
-		view.face(g.dir)
+		if not views.has(i):
+			views[i] = make.call()
+			builder.get_parent().add_child(views[i])
+		var view: ActorView = views[i]
+		view.position = Vector3(e.pos.x, 0, e.pos.y) / float(unit) * LevelBuilder.TILE
+		view.face(e.dir)
+
+func _guard_view() -> ActorView:
+	var v := ActorView.new()
+	if LevelBuilder.art == "B":
+		var spr := LevelBuilder.sprite("ak_00")
+		spr.modulate = Color(1.0, 0.35, 0.3)   # ponytail: chưa có sprite tu sĩ áo đỏ, tô đỏ tạm ông lão ak_00
+		v.add_child(spr)
+	return v
+
+func _creature_view() -> ActorView:
+	var v := ActorView.new()
+	var spr := LevelBuilder.sprite("ae_01")   # ponytail: chưa có sprite sinh vật, dùng vệt bóng mờ phóng to
+	spr.modulate = Color(0.05, 0.0, 0.08)
+	spr.scale *= 3.0
+	v.add_child(spr)
+	return v
 
 func _unhandled_input(ev: InputEvent) -> void:
 	# DialogBox (sâu hơn trong cây) nhận phím trước và đánh dấu handled khi đang mở.

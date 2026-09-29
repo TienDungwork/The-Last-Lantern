@@ -18,6 +18,11 @@ const GUARD_TILE_MS := 400           # method_231: tu sĩ đi 1 ô mất 400 ms
 const GUARD_SLOTS := 8
 const GUARD_SIGHT := 4               # nửa ô (= 2 ô)
 const CLOAK := 20                    # Áo choàng tu sĩ: tu sĩ không nhận ra, tối không mất máu
+const CREATURE_SLOTS := 16
+const CREATURE_TILE_MS := 200        # method_236: sinh vật đi 1 ô mất 200 ms
+const CREATURE_HP_MS := 1000         # ở trong sáng đủ chừng này ms thì chết
+const NO_CREATURE_LEVELS := [14, 15] # class_10 dòng 1652: phố và sân trước nhà Benjamin không có sinh vật
+enum { C_WAIT = 1, C_MOVING = 2, C_DYING = 3, C_DECIDE = 4 }   # field_481
 
 var level: LevelData
 var world: World
@@ -32,6 +37,10 @@ var bulbs := 0                   # bóng đèn đang có (field_278), riêng t�
 ## Tu sĩ (op 14 bit 0x80, field_465..472): null = ô trống. pos tính bằng 1/GUARD_TILE_MS ô để đi mượt theo ms.
 ## {pos: Vector2i, to: Vector2i, dir: int}
 var guards: Array = []
+## Sinh vật bóng tối (field_475..488): null = ô trống. pos tính bằng 1/CREATURE_TILE_MS ô.
+## {pos, from, to: Vector2i, dir, state, hp (ms còn chịu sáng), timer, age (ms, cho hoạt ảnh)}
+var creatures: Array = []
+var clock_ms := 0                # thời gian chơi trong màn (field_187), để sinh sinh vật mỗi giây
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2
@@ -172,6 +181,10 @@ func step(dir: int) -> Array:
 			target = player - d
 			if is_blocked(target):
 				return out
+		else:
+			var k := creature_at(box_to)
+			if k >= 0:
+				creatures[k] = null   # hộp đè sinh vật
 		boxes[box_to] = boxes[box_from]
 		boxes.erase(box_from)
 		light = []
@@ -278,6 +291,102 @@ func tick_guards(ms: int) -> void:
 		energy = 0
 		out.append({"type": "say", "text_id": 169, "portrait": -1})
 		out.append({"type": "death"})
+
+func spawn_creature(at: Vector2i, dir: int, dist: int) -> void:
+	## method_233: có quãng đường thì đi tới đó, không thì đứng "nghĩ" (C_DECIDE).
+	var c := {"pos": at * CREATURE_TILE_MS, "from": at, "to": at, "dir": dir, "state": C_DECIDE,
+		"hp": CREATURE_HP_MS, "timer": 0, "age": 0}
+	if dist > 0:
+		c.state = C_MOVING
+		c.to = at + DIR_VEC.get(dir, Vector2i.ZERO) * dist
+	var i := creatures.find(null)
+	if i >= 0:
+		creatures[i] = c
+	elif creatures.size() < CREATURE_SLOTS:
+		creatures.append(c)
+
+func creature_at(p: Vector2i) -> int:
+	## method_238: sinh vật đang ở / đang đi tới ô p.
+	for i in creatures.size():
+		var c = creatures[i]
+		if c != null and (c.to == p or c.from == p):
+			return i
+	return -1
+
+func tick_creatures(ms: int, rng: RandomNumberGenerator) -> void:
+	## method_236. Bị chiếu thì chạy về ô kề tối nhất; trong sáng đủ CREATURE_HP_MS thì chết.
+	## Đứng yên thì mỗi lần nghĩ: 10% biến mất, 63% chờ 1,5–3 s, còn lại đi sang ô kề tối nhất.
+	if level.index in NO_CREATURE_LEVELS:
+		return
+	for i in creatures.size():
+		var c = creatures[i]
+		if c == null:
+			continue
+		var lvl := light_level(c.pos / CREATURE_TILE_MS)
+		if c.state != C_DYING:
+			if lvl == 0:
+				c.hp = CREATURE_HP_MS
+			else:
+				c.hp -= ms
+				if c.hp <= 0:
+					c.state = C_DYING
+					c.timer = 0
+					world.creatures_killed += 1
+		if c.state in [C_WAIT, C_DECIDE] and lvl > 0:
+			_flee(c, rng)
+		if c.state == C_DECIDE:
+			if rng.randi() % 100 < 10:
+				creatures[i] = null
+				continue
+			elif rng.randi() % 100 < 70:
+				c.state = C_WAIT
+				c.timer = rng.randi() % 1500 + 1500
+			else:
+				_flee(c, rng)
+		c.age += ms
+		match c.state:
+			C_WAIT:
+				c.timer -= ms
+				if c.timer <= 0:
+					c.state = C_DECIDE
+			C_MOVING:
+				var d := Vector2i(signi(c.to.x - c.from.x), 0)
+				if d.x == 0:
+					d.y = signi(c.to.y - c.from.y)
+				c.dir = {Vector2i(1, 0): 1, Vector2i(0, 1): 2, Vector2i(-1, 0): 3, Vector2i(0, -1): 4}.get(d, c.dir)
+				var goal: Vector2i = c.to * CREATURE_TILE_MS
+				var left := absi((goal - c.pos).x + (goal - c.pos).y)
+				if ms < left:
+					c.pos += d * ms
+				else:
+					c.pos = goal
+					c.state = C_DECIDE
+			C_DYING:
+				c.timer += ms
+				if c.timer >= 1000:
+					creatures[i] = null
+	clock_ms += ms
+	if clock_ms / 1000 != (clock_ms - ms) / 1000:
+		rng.randi()   # bản gốc: "% 40 < 40", luôn đúng nhưng vẫn rút một số
+		var p := Vector2i(rng.randi() % level.width, rng.randi() % level.height)
+		if not is_lit(p) and tile_at(p) < 8 and not boxes.has(p):
+			spawn_creature(p, rng.randi() % 4 + 1, 0)
+
+func _flee(c: Dictionary, rng: RandomNumberGenerator) -> void:
+	## method_237: sang ô kề không bị chặn, không có sinh vật khác, tối nhất; thử 4 hướng từ một hướng ngẫu nhiên.
+	var p: Vector2i = c.pos / CREATURE_TILE_MS
+	var r := rng.randi()
+	var best := 10
+	var pick := Vector2i.ZERO
+	for k in 4:
+		var d: Vector2i = DIR_VEC[(r + k) % 4 + 1]
+		if not is_blocked(p + d) and creature_at(p + d) < 0 and light_level(p + d) < best:
+			best = light_level(p + d)
+			pick = d
+	if best < 10:
+		c.state = C_MOVING
+		c.from = p
+		c.to = p + pick
 
 func sees(a: Vector2i, b: Vector2i, r: int) -> bool:
 	## method_153, nửa ô: a trong ô vuông bán kính r quanh b và đường từ b tới a không qua ô chắn sáng (kể cả hộp).

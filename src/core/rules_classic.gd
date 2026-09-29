@@ -26,6 +26,7 @@ func tick(dt_ms: int) -> void:
 		return   # đã chết, chờ game.gd nạp lại màn
 	s.tick_timers(dt_ms)
 	s.tick_guards(dt_ms)
+	s.tick_creatures(dt_ms, rng)
 	s.check_light_sensors()
 	light = s.light_map()   # GridState xóa bản đồ khi ô/đèn đổi; tính lại khi cần
 	if s.is_lit(s.player) or s.world.equipped == GridState.CLOAK:

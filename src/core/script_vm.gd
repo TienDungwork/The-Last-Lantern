@@ -130,7 +130,7 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			if int(a[3]) & 0x80:
 				st.spawn_guard(Vector2i(int(a[0]), int(a[1])), int(a[2]), int(a[3]) & 0x7F)
 			else:
-				st.out.append({"type": "todo", "op": op, "args": a})
+				st.spawn_creature(Vector2i(int(a[0]), int(a[1])), int(a[2]), int(a[3]))
 		22:   # tu sĩ chỉ đi theo vào sự kiện cờ 64
 			var callee: Dictionary = st.events[int(a[0])]
 			run(callee, actor if int(callee.flags) & GridState.F_BY_ACTOR else -1)
