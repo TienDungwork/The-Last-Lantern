@@ -8,6 +8,7 @@ const KEYS := {
 	"menu": [KEY_ESCAPE], "inventory": [KEY_TAB, KEY_I], "map": [KEY_M],
 }
 const DIR_ACTION := {"move_right": 1, "move_down": 2, "move_left": 3, "move_up": 4}
+const PIXEL_SCALE := 2   # kiểu B: 1 pixel cảnh = 2x2 pixel cửa sổ (1280x720 -> cảnh 640x360)
 
 @export var start_level := 0
 @export var lang := "vi"
@@ -29,16 +30,17 @@ var _step_wait := 0.0        # giây còn lại trước khi được đi ô ti�
 
 func _ready() -> void:
 	_setup_input()
+	var world: Node = _pixel_viewport() if LevelBuilder.art == "B" else self
 	builder = LevelBuilder.new()
-	add_child(builder)
+	world.add_child(builder)
 	lighting = LightingView.new()
-	add_child(lighting)
+	world.add_child(lighting)
 	lighting.setup_environment()
 	actor = ActorView.new()
-	add_child(actor)
+	world.add_child(actor)
 	rig = CameraRig.new()
 	rig.target = actor
-	add_child(rig)
+	world.add_child(rig)
 	var ui := CanvasLayer.new()
 	add_child(ui)
 	hud = Hud.new()
@@ -47,6 +49,25 @@ func _ready() -> void:
 	ui.add_child(dialog)
 	dialog.closed.connect(_next_say)
 	load_level(start_level)
+
+## Kiểu B: vẽ cảnh 3D ở 1/PIXEL_SCALE độ phân giải rồi phóng nguyên lần bằng nearest, pixel sắc và đều.
+## UI vẫn vẽ ở độ phân giải đầy đủ. Trả về node chứa cảnh 3D.
+func _pixel_viewport() -> Node:
+	var layer := CanvasLayer.new()
+	layer.layer = -1   # dưới UI
+	add_child(layer)
+	var box := SubViewportContainer.new()
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.stretch = true
+	box.stretch_shrink = PIXEL_SCALE
+	box.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(box)
+	var vp := SubViewport.new()
+	vp.own_world_3d = true
+	vp.handle_input_locally = false
+	box.add_child(vp)
+	return vp
 
 func _setup_input() -> void:
 	for action in KEYS:

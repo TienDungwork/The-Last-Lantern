@@ -9,7 +9,7 @@ const LEVEL_COLORS := [
 const DIR_TO_VEC := {1: Vector3(1, 0, 0), 2: Vector3(0, 0, 1), 3: Vector3(-1, 0, 0), 4: Vector3(0, 0, -1)}
 
 var _lights: Array[Light3D] = []
-var _props: Array[MeshInstance3D] = []
+var _props: Array[Node3D] = []
 
 func setup_environment() -> void:
 	var env := Environment.new()
@@ -18,12 +18,16 @@ func setup_environment() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.2, 0.2, 0.3)
 	env.ambient_light_energy = 0.25
+	if LevelBuilder.art == "B":   # tối vẫn thấy lờ mờ nền; không glow (phủ mờ cả cảnh)
+		env.ambient_light_color = Color(0.3, 0.3, 0.36)
+		env.ambient_light_energy = 0.45
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
 func sync(s: GridState, field: Array, builder: LevelBuilder) -> void:
-	for p in builder.floors:
+	# Kiểu B: sàn giữ màu texture, để đèn thật tỏa mềm thay vì tô từng ô.
+	for p in builder.floors if LevelBuilder.art != "B" else []:
 		var lvl: int = field[p.y][p.x]
 		(builder.floors[p].material_override as StandardMaterial3D).albedo_color = LEVEL_COLORS[lvl]
 	for l in _lights:
@@ -34,7 +38,13 @@ func sync(s: GridState, field: Array, builder: LevelBuilder) -> void:
 	_props.clear()
 	for i in s.lights.size():
 		var L: Dictionary = s.lights[i]
-		if int(L.type) in [0, 1, 2] and i != s.carried:   # đèn nhặt được nằm dưới đất
+		if int(L.type) in [0, 1, 2] and i != s.carried and LevelBuilder.art == "B":
+			var sp := LevelBuilder.sprite("ad_14")
+			sp.shaded = int(L.on) == 0   # đèn đang cháy tự sáng
+			sp.position = LevelBuilder.world_pos(Vector2i(int(L.x), int(L.y)))
+			add_child(sp)
+			_props.append(sp)
+		elif int(L.type) in [0, 1, 2] and i != s.carried:   # đèn nhặt được nằm dưới đất
 			var mi := MeshInstance3D.new()
 			var m := CylinderMesh.new()
 			m.top_radius = 0.12
@@ -71,4 +81,9 @@ func sync(s: GridState, field: Array, builder: LevelBuilder) -> void:
 		light.light_color = Color(1.0, 0.85, 0.6)
 		light.light_energy = 2.0
 		light.shadow_enabled = true
+		if LevelBuilder.art == "B":   # bóng viền mềm, tắt dần êm
+			light.light_energy = 3.0
+			light.light_size = 0.2
+			if light is OmniLight3D:
+				light.omni_attenuation = 1.5
 		_lights.append(light)

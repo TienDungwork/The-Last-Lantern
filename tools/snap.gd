@@ -12,6 +12,8 @@ func _initialize() -> void:
 			level = int(args[i + 1])
 		if args[i] == "--out":
 			out = args[i + 1]
+		if args[i] == "--art":
+			LevelBuilder.art = args[i + 1]
 		if args[i] == "--steps":
 			steps = Array(args[i + 1].split(",")).map(func(v): return int(v))
 	var game: Node = load("res://src/game.tscn").instantiate()
