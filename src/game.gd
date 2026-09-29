@@ -9,6 +9,9 @@ const KEYS := {
 }
 const DIR_ACTION := {"move_right": 1, "move_down": 2, "move_left": 3, "move_up": 4}
 const SAVE_PATH := "user://save.json"
+# class_4.field_38 (nhạc mỗi màn, tài nguyên 54..60 = track 0..6); -1 = giữ nhạc đang phát (-123 ở bản gốc).
+const LEVEL_MUSIC := [6, 5, 4, 6, 2, 2, 0, 6, 0, 5, 5, 0, 6, 4, 2, 2, 6, 5, 0, 0, 0, -1]
+const TITLE_MUSIC := 4   # tài nguyên 58
 const PIXEL_SCALE := 2   # kiểu B: 1 pixel cảnh = 2x2 pixel cửa sổ (1280x720 -> cảnh 640x360)
 
 @export var start_level := 0
@@ -25,6 +28,8 @@ var dialog: DialogBox
 var hud: Hud
 var menu: Menu
 var _cutscene: ColorRect        # op 13: phủ màn đen + tranh
+var music: AudioStreamPlayer
+var music_track := -1
 var _say_queue: Array = []
 var _reload_after_dialog := false
 var _menu_in_game := false    # menu mở từ trong màn (không phải màn tiêu đề)
@@ -72,6 +77,9 @@ func _ready() -> void:
 	dialog = DialogBox.new()
 	ui.add_child(dialog)
 	dialog.closed.connect(_next_say)
+	music = AudioStreamPlayer.new()
+	music.finished.connect(music.play)   # nhạc lặp (class_0.method_1(x, -1))
+	add_child(music)
 	menu = Menu.new()
 	ui.add_child(menu)
 	menu.new_game.connect(_new_game)
@@ -93,6 +101,17 @@ func _to_title() -> void:
 	hud.hide()
 	menu.has_save = FileAccess.file_exists(SAVE_PATH)
 	menu.open_title()
+	play_music(TITLE_MUSIC)
+
+## Track đang phát thì để yên (không phát lại từ đầu); < 0 tắt.
+func play_music(track: int) -> void:
+	if track == music_track:
+		return
+	music_track = track
+	music.stop()
+	if track >= 0:
+		music.stream = load("res://assets/music/track_%d.wav" % track)
+		music.play()
 
 func _new_game() -> void:
 	hud.show()
@@ -153,6 +172,8 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 	_hud_slots.clear()
 	hud.highlight = -1
 	_set_cutscene(-1)
+	if LEVEL_MUSIC[n] >= 0:
+		play_music(LEVEL_MUSIC[n])
 	if n == ScriptVM.AUTOSAVE_LEVEL:
 		world.save_game(SAVE_PATH, n, state.player)
 	var out := state.enter().duplicate()
@@ -313,6 +334,8 @@ func _handle(out: Array) -> void:
 				_pending_level = o
 			"autosave":
 				world.save_game(SAVE_PATH, state.level.index, o.at)
+			"music":
+				play_music(o.track)
 			"death":
 				_say_queue.append({"text_id": 162, "portrait": -1})
 				_reload_after_dialog = true

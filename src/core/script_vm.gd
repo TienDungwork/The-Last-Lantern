@@ -5,7 +5,7 @@ extends RefCounted
 ## Sự kiện chạy hết -> tắt nếu không có cờ repeat. Bị hủy giữa chừng (IF_HOLDING sai, COUNTER chưa tới,
 ## PICKUP trong tối) -> vẫn bật, lần sau chạy lại được.
 
-const TODO_OPS := [1, 12]
+const TODO_OPS := [12]
 const AUTOSAVE_LEVEL := 14   # phố Ashwood: vào màn và rời màn đều tự lưu (method_112)
 const PERSIST := 0x80
 const MARKER_GROUP_FRAME := 380   # op 4: bật một điểm nhóm 380 thì tắt các điểm 380 khác
@@ -46,6 +46,9 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 		_exec_actor(op, a, actor)
 		return true
 	match op:
+		1:   # method_209 case 1 -> class_4 case 21: đổi nhạc (field_433 là byte có dấu, < 0 = tắt)
+			var t := int(a[0])
+			st.out.append({"type": "music", "track": t - 256 if t > 127 else t})
 		2:
 			st.out.append({"type": "say", "text_id": int(a[0]), "portrait": _u16(int(a[1]), int(a[2]))})
 		3:

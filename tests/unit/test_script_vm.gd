@@ -92,6 +92,14 @@ func test_enable_call_take_and_unknown() -> void:
 	eq(s.out[0].type, "todo", "lệnh chưa cài báo todo, không dừng")
 	eq(s.out[0].op, 12, "kèm mã lệnh")
 
+func test_music_op() -> void:
+	var s := GridState.new(LevelData.load_level(3))
+	s.vm.run(s.events[14])   # màn 3 event#14: op 1 [6]
+	eq(s.out.filter(func(o): return o.type == "music"), [{"type": "music", "track": 6}], "đổi sang track 6")
+	s.out.clear()
+	s.vm.run({"flags": 0, "commands": [{"op": 1, "args": [255]}]})
+	eq(s.out[0].track, -1, "byte 255 = -1: tắt nhạc")
+
 func test_cutscene_intro_then_continues() -> void:
 	# Op 13 (method_209 case 13): event#16 màn 16 = tranh 181 + 4 câu "Năm năm trước..." rồi vẫn chạy tiếp
 	# op 22 -> event#17 (khóa điều khiển, đi trái 3 ô).

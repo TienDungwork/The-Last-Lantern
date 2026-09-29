@@ -13,9 +13,11 @@ func test_title_new_game_inventory_pause() -> void:
 	await tree.process_frame
 	ok(game.menu.visible and not game.hud.visible, "mở game: màn tiêu đề, ẩn HUD")
 	eq(game._say_queue.size() + int(game.dialog.visible), 0, "nền tiêu đề không chạy thoại")
+	eq([game.music_track, game.music.stream != null], [game.TITLE_MUSIC, true], "nhạc tiêu đề")
 	game.menu._start(game.menu.new_game)
 	ok(not game.menu.visible and game.hud.visible, "trò chơi mới: vào màn")
 	eq(game.state.level.index, 0, "màn 0")
+	eq(game.music_track, game.LEVEL_MUSIC[0], "nhạc màn 0")
 
 	game.world.inventory.append(20)
 	game.menu.world = game.world
