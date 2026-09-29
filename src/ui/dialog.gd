@@ -16,10 +16,10 @@ var _tween: Tween
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	offset_top = -230
-	offset_left = 60
-	offset_right = -60
-	offset_bottom = -28
+	offset_top = -200
+	offset_left = 80
+	offset_right = -80
+	offset_bottom = -24
 	var sb := Hud.panel_style(FRAME)
 	sb.bg_color = Color(0.06, 0.045, 0.04, 0.92)
 	sb.set_border_width_all(4)
@@ -37,7 +37,7 @@ func _ready() -> void:
 	_portrait_box.add_theme_stylebox_override("panel", psb)
 	box.add_child(_portrait_box)
 	_portrait = TextureRect.new()
-	_portrait.custom_minimum_size = Vector2(150, 150)
+	_portrait.custom_minimum_size = Vector2(128, 128)
 	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -53,7 +53,6 @@ func _ready() -> void:
 	_more.polygon = PackedVector2Array([Vector2(0, 0), Vector2(18, 0), Vector2(9, 11)])
 	_more.color = FRAME.lightened(0.3)
 	add_child(_more)
-	resized.connect(func(): _more.position = size - Vector2(40, 30))
 	hide()
 
 func show_line(text_id: int, portrait: int, lang: String, args: Array = []) -> void:
@@ -71,6 +70,7 @@ func show_line(text_id: int, portrait: int, lang: String, args: Array = []) -> v
 	show()
 
 func _process(_delta: float) -> void:
+	_more.position = size - Vector2(40, 30)
 	_more.visible = visible and _label.visible_ratio >= 1.0 and Time.get_ticks_msec() % 800 < 500
 
 func _unhandled_input(ev: InputEvent) -> void:
