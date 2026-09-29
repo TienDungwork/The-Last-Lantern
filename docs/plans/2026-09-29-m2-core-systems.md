@@ -54,7 +54,17 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
      mất máu khi đứng ô sáng >= 4, chạm người chơi -1 năng lượng mỗi 2 s, chết -> 5 s -> chạy SPECIAL 8. Chặn đường.
    - Boss 2 (SPECIAL 10/11/12, `method_199/200`, màn 14): trôi sang phải, đèn trước mặt làm nó mất 1/4 máu và tắt,
      ai ở bên trái nó hoặc chạm cục lửa (SPECIAL 11) thì chết ngay; hết máu -> SPECIAL 12.
-4. Nhạc (op 1, MIDI→OGG), kết chương (op 13), minigame (op 12), special (op 30).
+4. ~~Nhạc (op 1)~~, ~~cảnh cắt (op 13)~~, minigame (op 12), special (op 30) — xong phần chính:
+   - Op 1 = đổi track (`class_4` case 21); nhạc mỗi màn `field_38`, tiêu đề = track 4. MIDI gốc cb..ch tổng hợp ra WAV
+     bằng `tools/midi_to_wav.py` (không có fluidsynth).
+   - Op 13 = cảnh cắt (màn giả 21): tranh frame 181..188 + N câu, xong chạy tiếp màn cũ (không nạp lại).
+   - Op 12 = tìm thấy minigame ẩn (câu 168, dừng kịch bản). **Chưa làm 3 minigame** (method_242/247/261), chỉ ghi nhận.
+   - SPECIAL 17 = bảng thống kê (câu 246, hạng A–F `method_218`) + 245 + 247..249, rồi về tiêu đề.
+   - SPECIAL 0/1/3/4 = câu đố tượng màn 2 (2 tia nắng mới ghép được chìa). Còn lại chỉ là hình ảnh, chưa làm:
+     7 xóa màn 7x7, 15/16 hoạt ảnh nằm/dậy, 13 frame 129 tĩnh, 14 đèn chớp, 5/6/9 con chó màn 15.
+   - **Op 8 với người chơi = ép đi từng ô** (`field_141`), sự kiện ô đi qua vẫn chạy; trước đây dịch tức thì làm kẹt
+     đoạn mở đầu. **Trò chơi mới = màn 16** (`class_4` case 14), tự đi rồi dịch chuyển sang màn 0 (6,4).
+   - `test_levels_smoke.gd`: đích dịch chuyển của 19 màn hợp lệ, chạy mọi sự kiện không lỗi.
 5. Bản đồ thành phố, ~~menu~~, ~~lưu game~~. Lưu: JSON `user://save.json` (`World.save_game/load_game`), tự lưu
    khi vào màn 14, khi TELEPORT lúc đang ở màn 14 và SPECIAL 18. Menu (`src/ui/menu.gd`): tiêu đề (Chơi tiếp dùng
    save), tạm dừng Esc, cài đặt, túi đồ lưới Tab/I để trang bị. Op 27 (mũi tên/nháy HUD) xong.
