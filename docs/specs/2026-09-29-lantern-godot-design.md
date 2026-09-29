@@ -69,10 +69,15 @@ rồi phát ra danh sách sự kiện, ví dụ `moved(actor, from, to)`, `light
   nên mọi luật chuyển sang đều phải qua test so sánh (mục 8).
 - **Bộ chạy kịch bản:** 31 lệnh gốc, độ dài tham số theo bảng `ARG_LEN` trong `tools\df2_decode.py`.
   Các cờ sự kiện gồm repeat, active, 4 hướng vào, by_actor, on_action. Lệnh mới cho Nâng cao đánh số từ 100.
-- **Thuộc tính ô:** `tile_props` trong `dc.dat`, gồm 189 loại ô với các bit `b0`, `b1`, `b2`, `movable_object`.
-  Ý nghĩa từng bit phải xác nhận từ `class_10` ở mốc 1, trước khi dùng cho va chạm và chắn sáng.
-- **Ánh sáng Cổ điển:** độ sáng từng ô tính giống bản gốc. Đứng ở ô tối thì mất máu. Nến mờ dần sau mỗi 2 bước.
-  Đèn tường cần bóng đèn (bóng đèn tính riêng từng màn). Có công tắc. Quái không vào vùng sáng.
+- **Thuộc tính ô (đã xác nhận ở M1):** `tile_props` trong `dc.dat`, 189 loại ô. bit0 `solid` (chắn đường),
+  bit1 `blocks_light` (chắn sáng), bit2 `dim_light` (chắn 40% khi sát ô đích), bit3 `movable` (hộp).
+- **Ánh sáng Cổ điển (đã khớp bản gốc ở màn 0):** `core/light_field.gd` chuyển nguyên `method_151/152`, đặt hàng
+  trước cột như bản gốc (`field_228[0]` = y). `dir` của đèn trùng mã hướng đi (1 phải, 2 xuống, 3 trái, 4 lên).
+  Test so sánh: 10 trạng thái trên tuyến đi màn 0, 254 ô sàn mỗi trạng thái, lệch 0 ô.
+- **Mất năng lượng trong tối theo thời gian thực** (không theo lượt, `method_97`): chờ 2000 + ngẫu nhiên 0..999 ms
+  rồi −1, quay lại tối sau khi ra sáng thì 800 ms. Năng lượng tối đa mặc định 4 (`field_152`).
+- **Cờ `on_action` (128):** sự kiện chạy khi vào màn (ví dụ #11 màn 0: cảnh mở đầu, 3 câu thoại hướng dẫn). M2 cài.
+- Còn lại: nến mờ dần sau mỗi 2 bước, đèn tường cần bóng đèn (tính riêng từng màn), công tắc, quái không vào vùng sáng (M2).
 
 ## 5. Cơ chế ánh sáng Nâng cao (`rules_enhanced.gd`)
 
@@ -135,4 +140,4 @@ Kế hoạch chi tiết viết cho từng mốc, bắt đầu từ M1.
 | Luật dịch ngược sai lệch với bản gốc | Test so sánh từng bước với bản gốc đang chạy được |
 | Mô hình 3D từ ảnh AI không đồng nhất | Dùng khối tạm đến M3; mỗi nhân vật duyệt riêng trước khi gắn động tác |
 | Cơ chế Nâng cao làm màn không giải được | Chế độ Cổ điển luôn còn; màn Nâng cao có test giải được |
-| Ý nghĩa bit trong `tile_props` chưa rõ | Xác nhận từ `class_10` trong M1 trước khi dùng |
+| Ý nghĩa bit trong `tile_props` chưa rõ | Đã xác nhận ở M1 (mục 4) |

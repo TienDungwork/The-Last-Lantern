@@ -620,6 +620,9 @@ git add -A; git commit -m "M1 T4: movement, bump, directional event triggering t
 
 Nguồn: `class_10.java` dòng 3648–3725 (`method_151`: quét 4 tia từ 4 góc nửa ô), 3728–3842 (`method_152`: một tia, trả về "khoảng cách suy giảm", 100 = chắn, 40 = chắn một phần), 3532–3575 (cộng các đèn, kẹp 7). Hằng `field_224`/`field_225` dòng 243–245.
 
+> **Đã sửa khi thực hiện (Task 13):** bản gốc đặt hàng trước cột (`field_228[0]` = y), nên code bên dưới bị đảo trục.
+> Bản đúng nằm ở `core/light_field.gd` (đã khớp bản gốc 100%); `dir` của đèn = mã hướng đi (1 phải, 2 xuống, 3 trái, 4 lên).
+
 **Files:**
 - Create: `core/light_field.gd`, `tests/test_light_field.gd`
 
