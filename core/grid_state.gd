@@ -21,8 +21,8 @@ var event_active: Array = []     # bool theo event id
 var player: Vector2i
 var facing: int = 2
 var control: bool = true
-var max_energy: int = 5          # ponytail: giá trị khởi đầu xác nhận ở Task 13 (field_152 bản gốc)
-var energy: int = 5
+var max_energy: int = 4          # field_152 bản gốc (= 4, đối chiếu tests/parity)
+var energy: int = 4
 var inventory: Array[int] = []
 var equipped: int = -1
 var out: Array = []

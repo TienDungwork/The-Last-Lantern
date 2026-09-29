@@ -1,0 +1,2 @@
+{"x": "g:byte", "y": "h:byte", "energy": "X:int", "max_energy": "Y:int", "level": "f:int",
+ "facing": "i:byte", "grid": "a:byte[][]"}

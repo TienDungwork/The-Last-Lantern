@@ -4,7 +4,7 @@
 
 **Mục tiêu:** Chơi được màn 0 ở chế độ Cổ điển trong Godot: đi 4 hướng, tường chắn, ánh sáng từng ô tính đúng như bản gốc, đứng trong tối mất năng lượng, đi vào tờ giấy thì nhặt Note 1 và hiện hai câu thoại có chân dung, hình 3D tạm (khối hộp), có test headless và có bộ so sánh với bản gốc.
 
-**Kiến trúc:** `core/` là logic thuần (không Node, không đồ họa), test bằng `godot --headless`. `view/` dựng cảnh 3D từ trạng thái `core`. `ui/` là hộp thoại và HUD. `game.gd` nối ba phần. Dữ liệu màn là JSON do `tools/export_data.py` sinh từ file `.dat` gốc, không sửa tay.
+**Kiến trúc:** `core/` là logic thuần (không Node, không đồ họa), test bằng `godot --headless`. `view/` dựng cảnh 3D từ trạng thái `core`. `ui/` là hộp thoại và HUD. `game.gd` nối ba phần. Dữ liệu màn là JSON do `tools/export_data.py` sinh từ file `.dat` gốc, không sửa tay.bus
 
 **Tài liệu liên quan:** thiết kế `docs/specs/2026-09-29-lantern-godot-design.md`; kế hoạch tổng `docs/plans/2026-09-29-master-plan.md`; giải mã dữ liệu `d:\ntiendung\games\tools\df2_decode.py`; code gốc `d:\ntiendung\games\darkest_fear_2_grim_243556\src\class_10.java`.
 

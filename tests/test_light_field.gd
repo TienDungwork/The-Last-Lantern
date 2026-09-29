@@ -39,10 +39,18 @@ func test_all_off_all_dark() -> void:
 	eq(total, 0, "không đèn thì toàn tối")
 
 func test_directional_light_has_no_back() -> void:
-	# light#11: (12,12) type 6 dir 2 on radius 3. Theo method_152, dir 2 chắn mọi ô
-	# có x nhỏ hơn đèn -> (11,12) tối, (13,12) sáng.
+	# Biến light#1 (6,5) thành đèn hướng phải (dir 1, type 6). method_152: dir 1 chắn mọi ô
+	# có x nhỏ hơn đèn -> (4,5) tối, (7,5) sáng.
+	var s := _state()
+	_only(s, 1)
+	s.lights[1].dir = 1
+	s.lights[1].type = 6
+	var m := LightField.compute(s)
+	eq(m[5][4], 0, "phía sau đèn hướng phải: tối")
+	ok(m[5][7] > 0, "phía trước đèn hướng phải: sáng")
+
+func test_directional_light_real_data() -> void:
+	# light#11 (12,12) type 6 dir 2 (xuống) radius 3: ô ngay dưới (12,13) sáng.
 	var s := _state()
 	_only(s, 11)
-	var m := LightField.compute(s)
-	eq(m[12][11], 0, "phía sau đèn có hướng: tối")
-	ok(m[12][13] > 0, "phía trước đèn có hướng: sáng")
+	ok(LightField.compute(s)[13][12] > 0, "đèn hướng xuống chiếu (12,13)")
