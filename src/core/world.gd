@@ -14,6 +14,48 @@ var energy: int = 4
 var map_markers: Dictionary = {} # id -> true (op 4/5, field_313)
 var map_revealed: Array = []     # Vector2i (op 15)
 var log: Array = []              # {type, level, id, x, y, value}
+var play_ms := 0                 # field_188, tổng thời gian chơi
+
+func cycle_equipped() -> void:
+	## ponytail: tạm đổi món trang bị bằng một phím (tay không -> từng món -> tay không); màn hình túi đồ làm cùng menu.
+	var opts: Array = [-1] + Array(inventory)
+	equipped = opts[(opts.find(equipped) + 1) % opts.size()]
+
+func save_game(path: String, level: int, at: Vector2i) -> void:
+	## method_112, dạng JSON. Không dùng var_to_str/str_to_var: file do người dùng giữ, chỉ đọc dữ liệu thuần.
+	var d := {"version": 1, "level": level, "x": at.x, "y": at.y, "inventory": inventory, "equipped": equipped,
+		"energy": energy, "max_energy": max_energy, "creatures_killed": creatures_killed, "play_ms": play_ms,
+		"map_markers": map_markers.keys(), "map_revealed": map_revealed.map(func(p): return [p.x, p.y]), "log": log}
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		push_error("Không ghi được save %s: %s" % [path, error_string(FileAccess.get_open_error())])
+		return
+	f.store_string(JSON.stringify(d))
+
+static func load_game(path: String) -> Dictionary:
+	## method_114. Trả về {world, level, at}; file không có hoặc hỏng -> {}.
+	if not FileAccess.file_exists(path):
+		return {}
+	var d = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not d is Dictionary or int(d.get("version", 0)) != 1:
+		push_error("Save hỏng hoặc khác phiên bản: %s" % path)
+		return {}
+	var w := World.new()
+	w.inventory.assign(d.inventory.map(func(v): return int(v)))
+	w.equipped = int(d.equipped)
+	w.energy = int(d.energy)
+	w.max_energy = int(d.max_energy)
+	w.creatures_killed = int(d.creatures_killed)
+	w.play_ms = int(d.play_ms)
+	for k in d.map_markers:
+		w.map_markers[int(k)] = true
+	w.map_revealed = d.map_revealed.map(func(p): return Vector2i(int(p[0]), int(p[1])))
+	for c in d.log:
+		var e := {}
+		for k in ["type", "level", "id", "x", "y", "value"]:
+			e[k] = int(c[k])
+		w.log.append(e)
+	return {"world": w, "level": int(d.level), "at": Vector2i(int(d.x), int(d.y))}
 
 func enter_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> GridState:
 	var s := GridState.new(LevelData.load_level(n), spawn, self)

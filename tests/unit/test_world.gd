@@ -39,3 +39,56 @@ func test_enable_then_disable_cancels() -> void:
 	w.log_change(World.SET_TILE, 5, 0, 1, 1, 10)
 	eq(w.log.size(), 1, "đổi cùng ô: ghi đè")
 	eq(w.log[0].value, 10, "giá trị mới nhất")
+
+func test_save_load_roundtrip() -> void:
+	var w := World.new()
+	w.inventory = [3, 20] as Array[int]
+	w.equipped = 20
+	w.energy = 2
+	w.max_energy = 5
+	w.creatures_killed = 7
+	w.play_ms = 123456
+	w.map_markers = {4: true, 12: true}
+	w.map_revealed = [Vector2i(35, 29)]
+	w.log_change(World.SET_TILE, 3, 0, 3, 5, 0)
+	var path := "user://test_save.json"
+	w.save_game(path, 14, Vector2i(20, 15))
+	var r := World.load_game(path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	eq([r.level, r.at], [14, Vector2i(20, 15)], "màn và vị trí")
+	var w2: World = r.world
+	eq([w2.inventory, w2.equipped, w2.energy, w2.max_energy, w2.creatures_killed, w2.play_ms],
+		[[3, 20] as Array[int], 20, 2, 5, 7, 123456], "chỉ số")
+	eq([w2.map_markers, w2.map_revealed], [{4: true, 12: true}, [Vector2i(35, 29)]], "bản đồ")
+	eq(w2.enter_level(3).tiles[5][3], 0, "sổ thay đổi áp lại được")
+	eq(World.load_game("user://khong_co.json"), {}, "không có file: rỗng")
+
+func test_cycle_equipped() -> void:
+	var w := World.new()
+	w.inventory = [3, 20] as Array[int]
+	w.cycle_equipped()
+	eq(w.equipped, 3, "tay không -> món đầu")
+	w.cycle_equipped()
+	eq(w.equipped, 20, "món sau")
+	w.cycle_equipped()
+	eq(w.equipped, -1, "hết vòng: bỏ trang bị")
+
+func test_taking_equipped_item_unequips() -> void:
+	var w := World.new()
+	var s := w.enter_level(0)
+	s.inventory.append(20)
+	w.equipped = 20
+	s.vm.run({"commands": [{"op": 19, "args": [20]}]})
+	eq(w.equipped, -1, "op 19 lấy mất áo đang mặc")
+
+func test_autosave_points() -> void:
+	# method_112: vào màn 14, TELEPORT khi đang ở màn 14 (lưu chỗ đứng trước khi đi), SPECIAL 18.
+	var w := World.new()
+	var s := w.enter_level(14, Vector2i(20, 15))
+	s.vm.run({"commands": [{"op": 6, "args": [1, 1, 3]}]})
+	eq(s.out.filter(func(o): return o.type == "autosave").map(func(o): return o.at), [Vector2i(20, 15)], "rời phố")
+	var bar := w.enter_level(0)
+	bar.vm.run({"commands": [{"op": 6, "args": [1, 1, 14]}]})
+	eq(bar.out.filter(func(o): return o.type == "autosave").size(), 0, "rời màn khác: không lưu")
+	bar.vm.run({"commands": [{"op": 30, "args": [18]}]})
+	eq(bar.out.filter(func(o): return o.type == "autosave").size(), 1, "SPECIAL 18")

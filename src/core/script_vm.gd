@@ -6,6 +6,7 @@ extends RefCounted
 ## PICKUP trong tối) -> vẫn bật, lần sau chạy lại được.
 
 const TODO_OPS := [1, 12, 13]
+const AUTOSAVE_LEVEL := 14   # phố Ashwood: vào màn và rời màn đều tự lưu (method_112)
 const PERSIST := 0x80
 const MARKER_GROUP_FRAME := 380   # op 4: bật một điểm nhóm 380 thì tắt các điểm 380 khác
 
@@ -63,7 +64,9 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			if int(a[2]) == st.level.index:
 				st.player = to
 				st.out.append({"type": "teleported", "to": to})
-			else:
+			if st.level.index == AUTOSAVE_LEVEL:   # lưu chỗ đứng (đã dịch chuyển nếu cùng màn) trước khi đổi màn
+				st.out.append({"type": "autosave", "at": st.player})
+			if int(a[2]) != st.level.index:
 				st.out.append({"type": "change_level", "level": int(a[2]), "to": to})
 		7:
 			st.control = int(a[0]) != 0
@@ -119,6 +122,8 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			a[0] = 0
 		19:
 			st.inventory.erase(int(a[0]))
+			if st.world.equipped == int(a[0]) and not st.inventory.has(int(a[0])):
+				st.world.equipped = -1
 			st.out.append({"type": "take_item", "item": int(a[0])})
 		20:
 			if _level_arg(int(a[1]), World.ENABLE, int(a[0])):
@@ -161,6 +166,7 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 				12:
 					st.boss2 = {}
 					st.fireballs.clear()
+				18: st.out.append({"type": "autosave", "at": st.player})
 				_: st.out.append({"type": "special", "code": int(a[0])})
 		_:
 			if op in TODO_OPS:

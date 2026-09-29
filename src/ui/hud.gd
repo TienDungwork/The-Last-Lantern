@@ -12,5 +12,7 @@ func _process(_delta: float) -> void:
 	modulate = Color(1, 0.85, 0.3) if highlight and Time.get_ticks_msec() % 500 <= 300 else Color.WHITE
 
 func show_state(s: GridState, light_level: int) -> void:
-	text = "Năng lượng %d/%d   Bóng đèn %d   Ô (%d,%d)   Sáng %d   Túi %s" % [
-		s.energy, s.max_energy, s.bulbs, s.player.x, s.player.y, light_level, str(s.inventory)]
+	var eq := s.world.equipped
+	text = "Năng lượng %d/%d   Bóng đèn %d   Ô (%d,%d)   Sáng %d   Túi %s   Trang bị [Tab]: %s" % [
+		s.energy, s.max_energy, s.bulbs, s.player.x, s.player.y, light_level, str(s.inventory),
+		LevelData.text(int(LevelData.item(eq).name_id)) if eq >= 0 else "-"]

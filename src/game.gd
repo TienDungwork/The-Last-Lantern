@@ -8,6 +8,7 @@ const KEYS := {
 	"menu": [KEY_ESCAPE], "inventory": [KEY_TAB, KEY_I], "map": [KEY_M],
 }
 const DIR_ACTION := {"move_right": 1, "move_down": 2, "move_left": 3, "move_up": 4}
+const SAVE_PATH := "user://save.json"
 const PIXEL_SCALE := 2   # kiểu B: 1 pixel cảnh = 2x2 pixel cửa sổ (1280x720 -> cảnh 640x360)
 
 @export var start_level := 0
@@ -96,9 +97,20 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 		views.clear()
 	_hud_slots.clear()
 	hud.highlight = false
+	if n == ScriptVM.AUTOSAVE_LEVEL:
+		world.save_game(SAVE_PATH, n, state.player)
 	var out := state.enter().duplicate()
 	state.out.clear()
 	_handle(out)
+
+## "Chơi tiếp": nạp save rồi vào đúng màn, đúng chỗ. Không có save thì trả false.
+func continue_from_save(path: String = SAVE_PATH) -> bool:
+	var r := World.load_game(path)
+	if r.is_empty():
+		return false
+	world = r.world
+	load_level(r.level, r.at)
+	return true
 
 func _refresh_light() -> void:
 	rules.refresh_light()
@@ -121,6 +133,7 @@ func _process(delta: float) -> void:
 		state.step(DIR_ACTION[_held.back()])   # step() xóa out cũ trước khi ghi
 		_step_wait = ActorView.STEP_TIME
 	rules.tick(int(delta * 1000.0))
+	world.play_ms += int(delta * 1000.0)
 	_sync_entities()
 	if not state.out.is_empty():
 		var out := state.out.duplicate()
@@ -221,10 +234,15 @@ func _set_pointer(slot: int, p) -> void:
 
 func _unhandled_input(ev: InputEvent) -> void:
 	# DialogBox (sâu hơn trong cây) nhận phím trước và đánh dấu handled khi đang mở.
-	if ev.is_action_pressed("interact") and not dialog.visible and _pending_level.is_empty() and not _reload_after_dialog:
+	if dialog.visible or not _pending_level.is_empty() or _reload_after_dialog:
+		return
+	if ev.is_action_pressed("interact"):
 		var out := state.action().duplicate()
 		state.out.clear()
 		_handle(out)
+	elif ev.is_action_pressed("inventory"):
+		world.cycle_equipped()
+		_refresh_light()
 
 func _handle(out: Array) -> void:
 	for o in out:
@@ -244,6 +262,8 @@ func _handle(out: Array) -> void:
 				builder.rebuild_tile(state, o.at)
 			"change_level":
 				_pending_level = o
+			"autosave":
+				world.save_game(SAVE_PATH, state.level.index, o.at)
 			"death":
 				_say_queue.append({"text_id": 162, "portrait": -1})
 				_reload_after_dialog = true
