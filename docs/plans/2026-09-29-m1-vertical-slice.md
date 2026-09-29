@@ -642,7 +642,7 @@ func test_lit_near_lamp_dark_far() -> void:
 	var m := LightField.compute(_state())
 	ok(m[4][6] > 0, "ô start sáng")
 	ok(m[4][6] <= 7, "kẹp 7")
-	eq(m[20][2], 0, "góc xa (2,20) tối")
+	eq(m[13][16], 0, "(16,13) ngoài tầm mọi đèn đang bật: tối")
 
 func test_wall_blocks_light() -> void:
 	# Tường cột x=8 (0x38) chắn giữa đèn (6,5) và ô (9,5)? (9,5) có thể được đèn khác chiếu,
