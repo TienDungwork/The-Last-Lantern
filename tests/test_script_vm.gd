@@ -1,4 +1,4 @@
-extends "res://tests/test_base.gd"
+﻿extends "res://tests/test_base.gd"
 
 func _say_ids(out: Array) -> Array:
 	var r := []
@@ -14,7 +14,7 @@ func test_read_note_1() -> void:
 	eq(s.inventory, [0] as Array[int], "nhặt Note 1 (item 0)")
 	eq(_say_ids(out), [228, 7], "hai câu thoại đúng thứ tự")
 	var says := out.filter(func(o): return o.type == "say")
-	eq(says[0].portrait, 325, "chân dung Jack")
+	eq(says[0].portrait, 325, "hình tờ giấy (khung 325)")
 	eq(says[1].portrait, 171, "chân dung Hale")
 	eq(s.event_active[21], false, "tắt #21")
 	eq(s.event_active[22], false, "tắt #22")
