@@ -24,6 +24,7 @@ var event_active: Array = []     # bool theo event id
 var plate_saved: Dictionary = {} # event id bàn đạp đang mở -> ô cửa gốc
 var boxes: Dictionary = {}       # Vector2i -> ô hộp; tách khỏi lưới lúc nạp (field_204..206)
 var carried := -1                # chỉ số đèn đang cầm (field_149), -1 = tay không
+var bulbs := 0                   # bóng đèn đang có (field_278), riêng từng màn
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2
@@ -169,6 +170,7 @@ func step(dir: int) -> Array:
 		out.append({"type": "box_moved", "from": box_from, "to": box_to})
 	if is_solid(target):
 		out.append({"type": "bumped", "dir": dir})
+		_press_switch(target)
 		for e in events_at(target, dir):
 			vm.run(e)
 	else:
@@ -197,6 +199,44 @@ func action() -> Array:
 				light = []
 	check_light_sensors()
 	return out
+
+func _press_switch(p: Vector2i) -> void:
+	## method_92: công tắc tường khung 63 (ngang) / 52 (dọc) bật-tắt đèn loại 5 ở ô trái-phải / dưới-trên,
+	## rồi thành khung 62 / 53 (đã gạt, không gạt lại được).
+	var t := tile_at(p) - 8
+	var side: Vector2i
+	match t:
+		63: side = Vector2i(1, 0)
+		52: side = Vector2i(0, 1)
+		_: return
+	set_tile(p, t + 8 + (-1 if t == 63 else 1))
+	for q in [p + side, p - side]:
+		var i := _light_index(q, 5)
+		if i >= 0:
+			lights[i].on = 1 - int(lights[i].on)
+			out.append({"type": "light_changed", "light": i})
+			return
+
+func toggle_bulb(i: int) -> void:
+	## Op 23 (method_209): hốc đèn sáng thì lấy bóng, tối thì lắp bóng nếu còn.
+	var L: Dictionary = lights[i]
+	if int(L.on) == 1:
+		bulbs += 1
+		L.on = 0
+	elif bulbs > 0:
+		bulbs -= 1
+		L.on = 1
+	else:
+		return
+	light = []
+	out.append({"type": "light_changed", "light": i})
+
+func _light_index(p: Vector2i, type: int) -> int:
+	## method_142: đèn đầu tiên đúng loại ở ô p.
+	for i in lights.size():
+		if int(lights[i].x) == p.x and int(lights[i].y) == p.y and int(lights[i].type) == type:
+			return i
+	return -1
 
 func _carry_light(dir: int) -> void:
 	var L: Dictionary = lights[carried]

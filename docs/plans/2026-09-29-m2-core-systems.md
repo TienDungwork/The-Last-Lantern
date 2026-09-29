@@ -37,7 +37,8 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
 
 ## Phần C — còn lại (thứ tự làm)
 
-1. Bóng đèn/đui (op 23), công tắc tường (ô 63/52 -> đèn loại 5).
+1. ~~Bóng đèn/đui (op 23), công tắc tường~~ — xong: đâm hốc sáng lấy bóng, hốc tối lắp bóng (`GridState.bulbs`,
+   reset mỗi màn như `field_278`). Công tắc khung 63/52 bật-tắt đèn loại 5 ở hai bên rồi thành 62/53, chỉ gạt một lần.
 2. Actor: quái/tu sĩ (op 27), đạn (op 14).
 4. Nhạc (op 1, MIDI→OGG), kết chương (op 13), minigame (op 12), special (op 30).
 5. Bản đồ thành phố, menu, lưu game (autosave rời màn 14).

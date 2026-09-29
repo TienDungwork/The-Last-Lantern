@@ -194,6 +194,39 @@ func test_timer_fires_after_its_ms() -> void:
 	eq(s.out.filter(func(o): return o.type == "say").map(func(o): return o.text_id), [8, 9], "tới giờ: chạy")
 	eq(s.event_active[42], false, "không repeat: tắt")
 
+func test_wall_switch_toggles_spotlight_once() -> void:
+	# method_92: đâm công tắc ô 71 (khung 63) -> bật/tắt đèn loại 5 ở ô trái/phải, ô thành 70 (đã gạt, gạt lại không có tác dụng).
+	var s := GridState.new(LevelData.load_level(0), Vector2i(3, 13))
+	eq(int(s.lights[9].on), 0, "đèn chiếu (3,13) đang tắt")
+	s.step(3)
+	eq(int(s.lights[9].on), 1, "gạt công tắc: đèn bật")
+	eq(s.tile_at(Vector2i(2, 13)), 70, "công tắc đổi sang đã gạt")
+	s.step(3)
+	eq(int(s.lights[9].on), 1, "gạt lại: không đổi")
+
+func test_bulb_socket_take_and_put() -> void:
+	# Op 23 (event#2 màn 0, đèn #11 ở hốc (12,11) đang sáng): đâm vào lấy bóng, đâm hốc tối thì lắp bóng.
+	var s := GridState.new(LevelData.load_level(0), Vector2i(12, 12))
+	s.step(4)
+	eq(s.bulbs, 1, "lấy được một bóng")
+	eq(int(s.lights[11].on), 0, "hốc tắt")
+	eq(s.out.filter(func(o): return o.type == "say").map(func(o): return o.text_id), [17, 18], "hướng dẫn bóng đèn lần đầu")
+	s.step(4)
+	eq(s.bulbs, 0, "lắp lại bóng")
+	eq(int(s.lights[11].on), 1, "hốc sáng lại")
+	s.step(4)
+	s.bulbs = 0
+	s.step(4)
+	eq(s.bulbs, 0, "hốc tối, hết bóng: không làm gì")
+	eq(int(s.lights[11].on), 0, "vẫn tối")
+
+func test_bulbs_are_per_level() -> void:
+	var w := World.new()
+	var s := w.enter_level(0, Vector2i(12, 12))
+	s.step(4)
+	eq(s.bulbs, 1, "có bóng")
+	eq(w.enter_level(0).bulbs, 0, "vào lại màn: bóng về 0 (field_278 reset khi nạp màn)")
+
 class _CountingVM extends ScriptVM:
 	var runs := 0
 	func run(e: Dictionary) -> bool:

@@ -125,7 +125,7 @@ func _exec(e: Dictionary, op: int, a: Array) -> bool:
 		22:
 			run(st.events[int(a[0])])
 		23:
-			st.out.append({"type": "bulb_socket", "light": int(a[0]) & 0x7F})
+			st.toggle_bulb(int(a[0]) & 0x7F)
 		25:   # method_209 case 25: hồi đầy năng lượng kèm câu 234
 			st.out.append({"type": "say", "text_id": 234, "portrait": -1})
 			st.energy = st.max_energy
