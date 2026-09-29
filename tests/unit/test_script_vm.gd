@@ -137,6 +137,18 @@ func test_statue_needs_two_sun_beams() -> void:
 	ok(s.event_active[14] and s.sun_beam.is_empty(), "đủ điều kiện: chạy tiếp, tắt tia")
 	ok(s.out.any(func(o): return o.type == "cutscene" and o.frame == 182), "cảnh ghép chìa khóa")
 
+func test_fx_specials() -> void:
+	var s := GridState.new(LevelData.load_level(15))
+	s.vm.run(s.events[9])
+	eq([s.dog.at, s.dog.visible], [Vector2i(8, 4), true], "SPECIAL 5: chó hiện ở ô sự kiện")
+	s.vm.run({"flags": 0, "commands": [{"op": 30, "args": [6]}, {"op": 30, "args": [9]}]})
+	eq([s.dog.pose, s.dog.sleep], [1, true], "SPECIAL 6 đổi tư thế, 9 ngủ")
+	s.out.clear()
+	s.vm.run({"flags": 0, "commands": [{"op": 30, "args": [15]}, {"op": 30, "args": [7]}]})
+	eq(s.out, [{"type": "pose", "lying": true}, {"type": "wipe"}], "SPECIAL 15 nằm, 7 xoá màn")
+	eq([Wipe.cell(16, 0), Wipe.cell(16, 1), Wipe.cell(16, 2), Wipe.cell(Wipe.END_TICKS, 12)], [16, 9, 1, 16],
+		"ô chéo d nở từ tick 8d, kín 16 ở tick cuối")
+
 func test_game_end_stats() -> void:
 	# SPECIAL 17 (method_217): câu 246 kèm thống kê + hạng, 245 mã thưởng, 247+g cho minigame đã tìm, rồi hết game.
 	var s := GridState.new(LevelData.load_level(0))

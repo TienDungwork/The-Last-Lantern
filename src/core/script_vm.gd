@@ -201,6 +201,19 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 							st.out.append({"type": "say", "text_id": 247 + g, "portrait": -1})
 					st.out.append({"type": "game_end"})
 				18: st.out.append({"type": "autosave", "at": st.player})
+				5:
+					st.dog.at = Vector2i(int(e.x), int(e.y))
+					st.dog.visible = not st.dog.visible
+				6: st.dog.pose = 1 - st.dog.pose
+				9: st.dog.sleep = true
+				7:   # method_185: xoá màn 7x7; bản gốc dừng kịch bản tới khi xong (field_353) rồi trả điều khiển
+					st.out.append({"type": "wipe"})
+					st.control = true
+				15, 16:   # method_105: Hale nằm xuống / đứng dậy, kịch bản chờ xong (field_413)
+					st.out.append({"type": "pose", "lying": int(a[0]) == 15})
+					st.control = int(a[0]) == 16
+				13, 14:
+					pass   # cây chết / biển PUB chớp: LevelBuilder quét sự kiện khi dựng cảnh (method_190/193)
 				_: st.out.append({"type": "special", "code": int(a[0])})
 		_:
 			push_error("ScriptVM: mã lệnh lạ %d" % op)

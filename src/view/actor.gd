@@ -73,6 +73,24 @@ func face(dir: int) -> void:
 	if s and dir in [1, 3]:
 		s.flip_h = dir == 1
 
+## SPECIAL 15/16 (method_105, field_145..148): nằm xuống 0.2 s rồi nằm yên; đứng dậy sau 1.5 s nằm, 1.3 s nhổm lên.
+## Kiểu B: ngả sprite nằm ngang (bỏ kéo cao bù góc nhìn khi nằm).
+func lie(lying: bool) -> float:
+	var s := get_child(0) as Sprite3D
+	if s == null:
+		return 0.0
+	var up_scale := 1.0 / cos(deg_to_rad(LevelBuilder.B_PITCH))
+	var tw := create_tween().set_parallel()
+	if lying:
+		tw.tween_property(s, "rotation:z", PI / 2, 0.2)
+		tw.tween_property(s, "scale:y", 1.0, 0.2)
+		return 1.7
+	s.rotation.z = PI / 2
+	s.scale.y = 1.0
+	tw.tween_property(s, "rotation:z", 0.0, 1.3).set_delay(1.5)
+	tw.tween_property(s, "scale:y", up_scale, 1.3).set_delay(1.5)
+	return 2.8
+
 func set_anim(anim: String) -> void:
 	var ap := get_node_or_null("AnimationPlayer") as AnimationPlayer
 	if ap and ap.has_animation(anim):

@@ -53,6 +53,61 @@ static func sprite(name: String) -> Sprite3D:
 	s.add_child(shadow)
 	return s
 
+## Frame gốc (16 px mỗi ô), origin = góc trên trái ô như method_55; trục y của sprite = hướng bắc của ảnh.
+## ponytail: dùng hình gốc vì bộ sprite AI chưa có con chó / biển PUB; vẽ lại thì thay bằng sprite().
+static func frame_sprite(frame: int) -> Sprite3D:
+	var s := Sprite3D.new()
+	s.pixel_size = TILE / 16.0
+	s.centered = false
+	s.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	set_frame(s, frame)
+	return s
+
+static func set_frame(s: Sprite3D, frame: int) -> void:
+	var f := Portraits.frame(frame)
+	s.texture = Portraits.texture(frame)
+	s.offset = Vector2(-f.anchor.x, f.anchor.y - f.rect.size.y)
+	s.set_meta("frame", frame)
+
+## SPECIAL 13 (method_190): cây chết ở tối đa 3 ô; SPECIAL 14 (method_193/191/192): biển PUB, chữ B chớp tắt.
+func _decor(s: GridState) -> void:
+	var trees := 0
+	for e in s.events:
+		if not e.has("x") or e.commands.is_empty() or int(e.commands[0].op) != 30:
+			continue
+		var at := Vector2i(int(e.x), int(e.y))
+		match int(e.commands[0].args[0]):
+			13 when trees < 3:
+				trees += 1
+				var t := sprite("ao_00")
+				t.scale *= 54.0 * 2 / t.texture.get_width()   # rộng bằng frame 129 gốc (54 px)
+				t.position = world_pos(at) + Vector3(0, 0, -0.5)
+				add_child(t)
+			14:
+				var pub := frame_sprite(119)
+				pub.shaded = false
+				pub.scale.y = 1.0 / cos(deg_to_rad(B_PITCH))
+				pub.position = world_pos(at) + Vector3(-0.5, 1.5, -0.5)   # ponytail: treo tạm trên nóc nhà, bản gốc vẽ phẳng
+				add_child(pub)
+				var b := frame_sprite(120)
+				b.shaded = false
+				b.position.z = 0.01
+				pub.add_child(b)
+				var timer := Timer.new()
+				timer.timeout.connect(_flicker.bind(b, timer))
+				pub.add_child(timer)
+				b.hide()
+				timer.start(5.0)
+
+## method_191: sáng 100-150 ms, tắt 100-150 ms, 1/4 số lần tắt 5-8 s.
+static func _flicker(b: Sprite3D, timer: Timer) -> void:
+	b.visible = not b.visible
+	var ms := 100 + randi() % 50
+	if not b.visible and randi() % 4 == 0:
+		ms = 5000 + randi() % 3000
+	timer.start(ms / 1000.0)
+
 ## Vật liệu kiểu A: ánh sáng phân bậc (toon) + viền sẫm bằng mặt lật phóng to.
 static func toon(color: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -100,6 +155,7 @@ func build(s: GridState) -> void:
 			_place(s, Vector2i(x, y))
 	for p in s.boxes:
 		boxes[p] = _block(p, s.boxes[p])
+	_decor(s)
 
 func move_box(from: Vector2i, to: Vector2i) -> void:
 	var mi: Node3D = boxes[from]

@@ -31,6 +31,9 @@ var menu: Menu
 var _cutscene: ColorRect        # op 13: phủ màn đen + tranh
 var music: AudioStreamPlayer
 var _beam_view := Node3D.new()    # SPECIAL 0/1/3
+var _dog_view := Node3D.new()     # SPECIAL 5/6/9
+var _wipe := Wipe.new()           # SPECIAL 7
+var _fx_wait := 0.0               # giây còn lại của hiệu ứng đang chặn hàng đợi thoại (xoá màn, nằm/đứng dậy)
 var music_track := -1
 var _say_queue: Array = []
 var _reload_after_dialog := false
@@ -65,6 +68,8 @@ func _ready() -> void:
 		fill.light_volumetric_fog_energy = 0.0
 		actor.add_child(fill)
 	world.add_child(_beam_view)
+	_dog_view.rotation.x = -PI / 2   # frame gốc vẽ từ trên xuống: nằm phẳng trên sàn
+	world.add_child(_dog_view)
 	rig = CameraRig.new()
 	rig.target = actor
 	world.add_child(rig)
@@ -77,6 +82,7 @@ func _ready() -> void:
 	_cutscene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_cutscene.hide()
 	ui.add_child(_cutscene)
+	ui.add_child(_wipe)
 	dialog = DialogBox.new()
 	ui.add_child(dialog)
 	dialog.closed.connect(_next_say)
@@ -100,6 +106,7 @@ func _to_title() -> void:
 	world = World.new()
 	load_level(0)
 	_say_queue.clear()
+	_fx_wait = 0.0
 	dialog.hide()
 	hud.hide()
 	menu.has_save = FileAccess.file_exists(SAVE_PATH)
@@ -175,6 +182,8 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 	_hud_slots.clear()
 	hud.highlight = -1
 	_set_cutscene(-1)
+	_fx_wait = 0.0
+	_wipe.hide()
 	if LEVEL_MUSIC[n] >= 0:
 		play_music(LEVEL_MUSIC[n])
 	if n == ScriptVM.AUTOSAVE_LEVEL:
@@ -198,6 +207,12 @@ func _refresh_light() -> void:
 	hud.show_state(state, rules.light[state.player.y][state.player.x])
 
 func _process(delta: float) -> void:
+	if _fx_wait > 0.0:
+		_fx_wait -= delta
+		if _fx_wait <= 0.0:
+			_wipe.hide()   # method_187: kín màn là tắt ngay, kịch bản chạy tiếp
+			_next_say()
+		return
 	if menu.visible or _reload_after_dialog or dialog.visible or not _pending_level.is_empty():
 		return
 	# Giữ phím là đi liên tục, mỗi ô đúng một nhịp ActorView.STEP_TIME (kể cả khi đâm tường,
@@ -240,6 +255,29 @@ func _sync_entities() -> void:
 	_sync_list(state.fireballs.map(func(p): return {"pos": p}), _fireball_views, 1, _sprite_view.bind("at_00", true))
 	if _beam_view.get_meta("beam", {}) != state.sun_beam:
 		_show_sun_beam(state.sun_beam)
+	if _dog_view.get_meta("dog", {}) != state.dog:
+		_show_dog(state.dog)
+
+## method_186: tư thế 0 = frame 148/145/146 + đầu 147 (nháy sang 149 mỗi 500 ms, ngủ 150 ms và rung), tư thế 1 = 150/151/152.
+func _show_dog(d: Dictionary) -> void:
+	_dog_view.set_meta("dog", d.duplicate())
+	for c in _dog_view.get_children():
+		c.queue_free()
+	if not d.visible:
+		return
+	_dog_view.position = LevelBuilder.world_pos(d.at, 0.02) - Vector3(0.5, 0, 0.5)
+	for f in ([150, 151, 152] if d.pose == 1 else [148, 145, 146, 147]):
+		_dog_view.add_child(LevelBuilder.frame_sprite(f))
+	if d.pose == 0:
+		var t := Timer.new()
+		t.timeout.connect(_dog_blink.bind(_dog_view.get_child(-1), d.sleep))
+		_dog_view.add_child(t)
+		t.start(0.15 if d.sleep else 0.5)
+
+func _dog_blink(head: Sprite3D, sleep: bool) -> void:
+	LevelBuilder.set_frame(head, 149 if head.get_meta("frame") == 147 else 147)
+	var j := Vector2(randi_range(-2, 2), randi_range(-2, 2)) if sleep else Vector2.ZERO
+	head.position = Vector3(j.x, -j.y, 0) / 16.0
 
 ## SPECIAL 0/1/3: tia nắng chéo từ trên ô gốc xuống sàn 3 ô phía dưới (bức tượng), 1 hoặc 2 tia.
 func _show_sun_beam(b: Dictionary) -> void:
@@ -327,7 +365,7 @@ func _set_pointer(slot: int, p) -> void:
 
 func _unhandled_input(ev: InputEvent) -> void:
 	# DialogBox (sâu hơn trong cây) nhận phím trước và đánh dấu handled khi đang mở.
-	if menu.visible or dialog.visible or not _pending_level.is_empty() or _reload_after_dialog:
+	if menu.visible or dialog.visible or not _pending_level.is_empty() or _reload_after_dialog or _fx_wait > 0.0:
 		return
 	menu.world = world
 	if ev.is_action_pressed("interact"):
@@ -351,7 +389,7 @@ func _handle(out: Array) -> void:
 				actor.face(o.dir)
 			"teleported":
 				actor.snap_to(o.to)
-			"say", "pointer", "cutscene", "cutscene_end", "game_end":   # áp đúng lúc giữa các câu thoại (kịch bản dừng ở mỗi câu)
+			"say", "pointer", "cutscene", "cutscene_end", "game_end", "wipe", "pose":   # áp đúng lúc giữa các câu thoại (kịch bản dừng ở mỗi câu)
 				_say_queue.append(o)
 			"box_moved":
 				builder.move_box(o.from, o.to)
@@ -367,7 +405,7 @@ func _handle(out: Array) -> void:
 				_say_queue.append({"text_id": 162, "portrait": -1})
 				_reload_after_dialog = true
 	_refresh_light()
-	if not dialog.visible:
+	if not dialog.visible and _fx_wait <= 0.0:
 		_next_say()
 
 func _next_say() -> void:
@@ -377,6 +415,14 @@ func _next_say() -> void:
 			"pointer": _set_pointer(p.slot, p.value)
 			"cutscene": _set_cutscene(p.frame)
 			"cutscene_end": _set_cutscene(-1)
+			"wipe":
+				_wipe.start()
+				_fx_wait = Wipe.TIME
+				return
+			"pose":
+				_fx_wait = actor.lie(p.lying)
+				if _fx_wait > 0.0:
+					return
 			"game_end":
 				_to_title()
 				return

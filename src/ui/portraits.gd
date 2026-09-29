@@ -10,7 +10,8 @@ static func frame(id: int) -> Dictionary:
 	if _frames.is_empty():
 		_frames = LevelData.read_json("res://data/frames.json")
 	var f: Array = _frames[id]
-	return {"png": f[0], "rect": Rect2(int(f[1]), int(f[2]), int(f[3]), int(f[4]))}
+	# anchor: class_7.method_55 vẽ frame tại (x, y) - anchor
+	return {"png": f[0], "rect": Rect2(int(f[1]), int(f[2]), int(f[3]), int(f[4])), "anchor": Vector2(int(f[5]), int(f[6]))}
 
 static func texture(id: int) -> Texture2D:
 	if _cache.has(id):

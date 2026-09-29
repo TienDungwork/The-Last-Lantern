@@ -6,6 +6,7 @@ func test_pointers_follow_dialog() -> void:
 	game.show_title = false
 	tree.root.add_child(game)
 	await tree.process_frame
+	skip_fx(game)
 	while game.dialog.visible:
 		game.dialog.hide()
 		game.dialog.closed.emit()
@@ -44,6 +45,29 @@ func test_cutscene_overlay_during_lines() -> void:
 	game.state.sun_beam = {"n": 2, "at": Vector2i(4, 1)}
 	game._sync_entities()
 	eq(game._beam_view.get_child_count(), 2, "hai tia nắng")
+	game.free()
+
+func test_door_wipe_then_change_level() -> void:
+	# Màn 15: event#9 hiện con chó; event#1 SPECIAL 7 rồi sang màn 8, chỉ đổi màn khi xoá màn xong.
+	var game: Node = load("res://src/game.tscn").instantiate()
+	game.show_title = false
+	game.start_level = 15
+	tree.root.add_child(game)
+	await tree.process_frame
+	game._say_queue.clear()
+	game.dialog.hide()
+	game.state.vm.run(game.state.events[9])
+	game._sync_entities()
+	eq(game._dog_view.get_child_count(), 5, "con chó: 4 mảnh + hẹn giờ nháy")
+	game.state.vm.run(game.state.events[1])
+	var out: Array = game.state.out.duplicate()
+	game.state.out.clear()
+	game._handle(out)
+	ok(game._wipe.visible and game.state.level.index == 15, "đang xoá màn, chưa đổi màn")
+	game._process(Wipe.TIME + 0.01)
+	eq([game._wipe.visible, game.state.level.index], [false, 8], "xoá xong: tắt lớp phủ, sang màn 8")
+	game.builder.build(GridState.new(LevelData.load_level(14)))
+	eq(game.builder.find_children("*", "Timer", true, false).size(), 1, "màn 14: biển PUB có đèn chớp")
 	game.free()
 
 func test_boss_view_follows_core() -> void:

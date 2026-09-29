@@ -56,6 +56,7 @@ var fireballs: Array = []        # Vector2i, cục lửa đứng yên (SPECIAL 1
 var pointers: Dictionary = {}    # op 27, slot -> {at, dir} (mũi tên) | {hud} (nháy HUD); mất khi vào màn
 var forced: Dictionary = {}      # op 8: {dir, n} còn phải ép đi; trong lúc này bỏ qua phím
 var sun_beam: Dictionary = {}    # SPECIAL 0/1/3 (field_334/335/336): {n: số tia 1|2, at: ô gốc}; mất khi vào màn
+var dog := {"at": Vector2i.ZERO, "visible": false, "pose": 0, "sleep": false}   # SPECIAL 5/6/9 (field_343..349), màn 15
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2

@@ -17,6 +17,7 @@ func test_teleport_loads_new_level_keeping_world() -> void:
 		if game.dialog.visible:
 			game.dialog.hide()
 			game.dialog.closed.emit()
+		skip_fx(game)
 		await tree.process_frame
 	eq(game.state.level.index, 14, "đã sang màn 14")
 	eq(game.state.player, Vector2i(13, 6), "đứng đúng chỗ")

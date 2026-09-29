@@ -7,6 +7,7 @@ func test_hold_key_walks_continuously() -> void:
 	game.show_title = false
 	tree.root.add_child(game)
 	await tree.process_frame
+	skip_fx(game)
 	while game.dialog.visible:   # thoại mở đầu màn 0 (sự kiện on-enter)
 		game.dialog.hide()
 		game.dialog.closed.emit()
