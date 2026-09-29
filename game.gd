@@ -22,6 +22,8 @@ var dialog: DialogBox
 var hud: Hud
 var _say_queue: Array = []
 var _reload_after_dialog := false
+var _held: Array = []        # phím hướng đang giữ, phím nhấn sau cùng ở cuối (được ưu tiên)
+var _step_wait := 0.0        # giây còn lại trước khi được đi ô tiếp theo
 
 func _ready() -> void:
 	_setup_input()
@@ -68,10 +70,18 @@ func _refresh_light() -> void:
 func _process(delta: float) -> void:
 	if _reload_after_dialog or dialog.visible:
 		return
+	# Giữ phím là đi liên tục, mỗi ô đúng một nhịp ActorView.STEP_TIME (kể cả khi đâm tường,
+	# để sự kiện "repeat" không chạy mỗi khung hình).
+	_step_wait = maxf(_step_wait - delta, 0.0)
 	for action in DIR_ACTION:
 		if Input.is_action_just_pressed(action):
-			state.step(DIR_ACTION[action])   # step() xóa out cũ trước khi ghi
-			break
+			_held.erase(action)
+			_held.append(action)
+		elif not Input.is_action_pressed(action):
+			_held.erase(action)
+	if _step_wait == 0.0 and not _held.is_empty():
+		state.step(DIR_ACTION[_held.back()])   # step() xóa out cũ trước khi ghi
+		_step_wait = ActorView.STEP_TIME
 	rules.tick(int(delta * 1000.0))
 	if not state.out.is_empty():
 		var out := state.out.duplicate()
