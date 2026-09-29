@@ -1,0 +1,138 @@
+# The Last Lantern II: bản làm lại 2.5D trên Godot (thiết kế)
+
+Ngày: 2026-09-29. Trạng thái: chờ duyệt.
+
+## 1. Mục tiêu
+
+Làm lại game trên Godot 4 với hình ảnh 2.5D, **giữ đủ 19 màn, câu đố, kịch bản và cốt truyện gốc**.
+Thêm cơ chế ánh sáng mới trong chế độ riêng.
+
+- **Chế độ Cổ điển:** chơi đúng luật gốc. Mọi màn chắc chắn giải được như bản điện thoại.
+- **Chế độ Nâng cao:** bật 6 cơ chế ánh sáng mới (mục 5). Màn nào bị kẹt thì được chỉnh bằng file bổ sung riêng.
+- Code nằm ở thư mục mới `d:\ntiendung\games\lantern_godot\`. Bản PC hiện tại (`df2_desktop\`) giữ nguyên, dùng làm
+  bản tham chiếu để so sánh luật chơi.
+
+Không làm trong đợt này: màn mới, chơi mạng, bản điện thoại hay web.
+
+## 2. Quyết định kỹ thuật
+
+| Vấn đề | Quyết định | Lý do |
+|---|---|---|
+| Engine | Godot 4 (bản ổn định mới nhất), renderer Forward+ | Miễn phí, nhẹ, có ánh sáng và bóng đổ 3D, xuất .exe dễ |
+| Ngôn ngữ | GDScript | Không cần .NET, sửa-chạy nhanh, có chế độ headless để test |
+| Dựng màn | Đọc JSON sinh từ `.dat` gốc, dựng cảnh 3D khi chạy | 19 màn đã giải mã đủ, không phải dựng tay |
+| Di chuyển | Logic theo ô (1 ô = 1 m), hình ảnh trượt mượt giữa các ô | Câu đố gốc (đẩy hộp, bán kính đèn, công tắc) đều tính theo ô |
+| Nhân vật | Mô hình 3D tạo từ ảnh concept (`img\image.png`) bằng Meshy/Tripo, gắn xương và động tác từ Mixamo, xuất glTF | Đi được mọi hướng mà không phải vẽ từng khung |
+| Phong cách | Shader tô kiểu tranh vẽ (ánh sáng phân bậc, viền, vân giấy) | Khớp với nét vẽ concept |
+| Ánh sáng | Tầng luật tính ô nào sáng; đèn Godot chỉ vẽ cho khớp | Thấy tối là đúng tối, không lệch giữa hình và luật |
+| Âm thanh | Chuyển MIDI gốc sang OGG khi xuất dữ liệu | Godot không phát MIDI |
+| Test | Script GDScript tự viết, chạy `godot --headless` | Không cần framework test |
+
+## 3. Cấu trúc thư mục
+
+```text
+lantern_godot/
+  project.godot
+  docs/specs/            tài liệu thiết kế
+  tools/export_data.py   đọc .dat, l, r, h của game gốc (dùng lại tools/df2_decode.py) → data/
+  data/                  SINH TỰ ĐỘNG, không sửa tay
+    levels/NN.json         ô gạch, nguồn sáng, sự kiện và kịch bản của màn NN
+    tiles.json             thuộc tính từng loại ô (đi qua được, chắn sáng, đẩy được) từ dc.dat
+    strings_vi.json, strings_en.json
+    citymap.json
+  data_enhanced/         file bổ sung cho chế độ Nâng cao, SỬA TAY: levels/NN.json
+  core/                  TẦNG LUẬT CHƠI, không đụng tới node 3D
+    grid_state.gd          bản đồ ô, đồ vật, nhân vật, túi đồ, cờ cốt truyện, máu
+    light_field.gd         độ sáng 0..7 của từng ô
+    rules_classic.gd       luật gốc
+    rules_enhanced.gd      luật Nâng cao (kế thừa luật gốc)
+    script_vm.gd           bộ chạy kịch bản: 31 lệnh gốc và lệnh mới từ 100 trở lên
+    save_game.gd           lưu JSON vào user://
+  view/                  TẦNG HÌNH ẢNH 3D
+    level_builder.gd       dựng sàn, tường, đồ vật từ grid
+    actor.gd               nhân vật 3D, trượt giữa các ô, chạy animation
+    lighting.gd            đặt OmniLight3D/SpotLight3D theo nguồn sáng của core
+    camera_rig.gd          camera nhìn xiên ~55°, bám Hale
+  ui/                    menu, hội thoại (chân dung concept), túi đồ, bản đồ, HUD, cảnh cắt
+  assets/                model .glb, texture, chân dung, nhạc .ogg, font tiếng Việt
+  tests/run.gd           chạy mọi test headless
+```
+
+## 4. Tầng luật chơi (`core/`)
+
+Game chạy theo **lượt**: mỗi lệnh của người chơi (đi, tương tác, dùng vật phẩm) được `core` xử lý trọn vẹn,
+rồi phát ra danh sách sự kiện, ví dụ `moved(actor, from, to)`, `light_changed(id)`, `say(string_id, portrait)`,
+`damaged(hp)`, `level_changed(n, x, y)`. `view/` và `ui/` chỉ nghe sự kiện để diễn hoạt, không tự đổi trạng thái.
+
+- **Nguồn luật gốc:** `darkest_fear_2_grim_243556\src\class_10.java`, gồm bộ chạy kịch bản `method_209`,
+  phần đọc màn `method_116/140/210`, ánh sáng và di chuyển. Bản dịch ngược có chỗ sai (đã biết: `class_7.method_52`),
+  nên mọi luật chuyển sang đều phải qua test so sánh (mục 8).
+- **Bộ chạy kịch bản:** 31 lệnh gốc, độ dài tham số theo bảng `ARG_LEN` trong `tools\df2_decode.py`.
+  Các cờ sự kiện gồm repeat, active, 4 hướng vào, by_actor, on_action. Lệnh mới cho Nâng cao đánh số từ 100.
+- **Thuộc tính ô:** `tile_props` trong `dc.dat`, gồm 189 loại ô với các bit `b0`, `b1`, `b2`, `movable_object`.
+  Ý nghĩa từng bit phải xác nhận từ `class_10` ở mốc 1, trước khi dùng cho va chạm và chắn sáng.
+- **Ánh sáng Cổ điển:** độ sáng từng ô tính giống bản gốc. Đứng ở ô tối thì mất máu. Nến mờ dần sau mỗi 2 bước.
+  Đèn tường cần bóng đèn (bóng đèn tính riêng từng màn). Có công tắc. Quái không vào vùng sáng.
+
+## 5. Cơ chế ánh sáng Nâng cao (`rules_enhanced.gd`)
+
+| Cơ chế | Luật |
+|---|---|
+| Cường độ | Mất máu theo độ sáng ô: 0 mất nhanh, 1–2 mất chậm, từ 3 trở lên không mất |
+| Bóng đổ | Tính theo tầm nhìn trên lưới (shadowcasting) từ mỗi nguồn sáng; tường, hộp, đồ cao chắn sáng; ô phía sau bị tối |
+| Nhiên liệu | Đèn lồng tốn dầu và đèn pin tốn pin theo số bước; hết thì tắt; bình dầu và pin đặt thêm trong `data_enhanced` |
+| Chập chờn | Đèn hỏng tắt/bật ngẫu nhiên có chu kỳ; kịch bản có lệnh làm đèn chập chờn; khi tắt, ô đó tính là tối |
+| Gương | Đồ vật mới, đẩy xoay được; tia đèn pin đổi hướng 90°; tia chạm "bộ thu sáng" thì kích hoạt sự kiện |
+| Ánh sáng màu | Vật phẩm đèn UV; ô, ký hiệu, lối đi ẩn chỉ hiện và đi được khi có ánh UV chiếu tới |
+
+`data_enhanced/levels/NN.json` chỉ **thêm hoặc ghi đè** đồ vật, sự kiện, nguồn sáng lên dữ liệu gốc.
+Không file bổ sung nào được sửa `data/`.
+
+## 6. Tầng hình ảnh (`view/`, `ui/`)
+
+- **Dựng màn:** sàn là mặt phẳng, tường là khối cao 2,5 m, đồ vật là mô hình hoặc khối tạm, đặt theo ô.
+  Ban đầu dùng texture phóng to từ ô gạch gốc, sau thay bằng texture vẽ mới.
+- **Nhân vật:** giai đoạn đầu là khối tạm (capsule) mang ảnh sprite gốc. Sau đó thay bằng mô hình `.glb`
+  với các động tác đứng, đi, đẩy, cầm đèn, chết. Hướng quay theo hướng đi.
+- **Ánh sáng:** môi trường gần như tối hẳn, có sương. Mỗi nguồn sáng của `core` tương ứng một đèn Godot, có bán kính
+  khớp với số ô sáng. Bóng đổ của Godot bật để hình khớp với luật bóng đổ ở chế độ Nâng cao.
+- **UI:**
+  - Hội thoại hiển thị chân dung cắt từ ảnh concept.
+  - Chữ lấy từ `strings_vi.json` / `strings_en.json`, dùng font hỗ trợ tiếng Việt (Be Vietnam Pro hoặc Noto Serif).
+  - Phím theo kiểu PC giống bản hiện tại: WASD/mũi tên, Enter/Space/E/F, Esc, Tab/I, M.
+
+## 7. Dữ liệu và công cụ
+
+`tools/export_data.py` sinh lại toàn bộ `data/` từ file gốc và phải chạy lại được nhiều lần cho cùng kết quả.
+Sửa màn bằng `viewer.html` rồi xuất lại là game mới nhận. Mỗi lần xuất có kiểm tra: đủ 19 màn, đủ 258 chuỗi
+mỗi ngôn ngữ, mọi file đọc hết đến byte cuối (giống các assert đang có trong `df2_decode.py`).
+
+## 8. Kiểm thử
+
+- **Test luật** (`tests/run.gd`, headless): nạp một màn, đưa chuỗi lệnh, so vị trí, máu, cờ, túi đồ với kết quả mong đợi.
+- **Test so sánh với bản gốc (chế độ Cổ điển):** mở rộng `df2_desktop\test\AutoPlay` để ghi lại vị trí, máu, màn,
+  cờ sau mỗi phím bằng reflection lên lớp `d`. Chạy cùng chuỗi phím trên `core` rồi so từng bước.
+  Màn chỉ được coi là xong khi khớp.
+- **Test giải được (chế độ Nâng cao):** mỗi màn có một chuỗi lệnh đi hết màn, chạy tự động mỗi lần sửa luật
+  hoặc sửa file bổ sung.
+
+## 9. Mốc thực hiện
+
+| Mốc | Nội dung | Xong khi |
+|---|---|---|
+| M1 | Xuất dữ liệu; core Cổ điển đủ cho màn 0; dựng 3D bằng hình tạm; hội thoại; chơi được màn 0 | Đi hết màn 0 như bản gốc, test so sánh màn 0 khớp |
+| M2 | Đủ 31 lệnh kịch bản, 19 màn Cổ điển, bản đồ thành phố, menu, lưu game, nhạc OGG | Test so sánh khớp cả 19 màn |
+| M3 | Hình ảnh: mô hình 3D nhân vật, shader tranh vẽ, texture tường/sàn, chân dung, cảnh cắt | Duyệt bằng mắt |
+| M4 | 6 cơ chế Nâng cao và file bổ sung cho từng màn | Test giải được qua cả 19 màn Nâng cao |
+| M5 | Xuất .exe Windows, tối ưu, sửa lỗi | Chạy được trên máy khác không cần cài gì |
+
+Kế hoạch chi tiết viết cho từng mốc, bắt đầu từ M1.
+
+## 10. Rủi ro
+
+| Rủi ro | Cách xử lý |
+|---|---|
+| Luật dịch ngược sai lệch với bản gốc | Test so sánh từng bước với bản gốc đang chạy được |
+| Mô hình 3D từ ảnh AI không đồng nhất | Dùng khối tạm đến M3; mỗi nhân vật duyệt riêng trước khi gắn động tác |
+| Cơ chế Nâng cao làm màn không giải được | Chế độ Cổ điển luôn còn; màn Nâng cao có test giải được |
+| Ý nghĩa bit trong `tile_props` chưa rõ | Xác nhận từ `class_10` trong M1 trước khi dùng |
