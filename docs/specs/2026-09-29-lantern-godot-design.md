@@ -32,30 +32,35 @@ Không làm trong đợt này: màn mới, chơi mạng, bản điện thoại h
 
 ```text
 lantern_godot/
-  project.godot
-  docs/specs/            tài liệu thiết kế
-  tools/export_data.py   đọc .dat, l, r, h của game gốc (dùng lại tools/df2_decode.py) → data/
-  data/                  SINH TỰ ĐỘNG, không sửa tay
-    levels/NN.json         ô gạch, nguồn sáng, sự kiện và kịch bản của màn NN
-    tiles.json             thuộc tính từng loại ô (đi qua được, chắn sáng, đẩy được) từ dc.dat
-    strings_vi.json, strings_en.json
-    citymap.json
-  data_enhanced/         file bổ sung cho chế độ Nâng cao, SỬA TAY: levels/NN.json
-  core/                  TẦNG LUẬT CHƠI, không đụng tới node 3D
-    grid_state.gd          bản đồ ô, đồ vật, nhân vật, túi đồ, cờ cốt truyện, máu
-    light_field.gd         độ sáng 0..7 của từng ô
-    rules_classic.gd       luật gốc
-    rules_enhanced.gd      luật Nâng cao (kế thừa luật gốc)
-    script_vm.gd           bộ chạy kịch bản: 31 lệnh gốc và lệnh mới từ 100 trở lên
-    save_game.gd           lưu JSON vào user://
-  view/                  TẦNG HÌNH ẢNH 3D
-    level_builder.gd       dựng sàn, tường, đồ vật từ grid
-    actor.gd               nhân vật 3D, trượt giữa các ô, chạy animation
-    lighting.gd            đặt OmniLight3D/SpotLight3D theo nguồn sáng của core
-    camera_rig.gd          camera nhìn xiên ~55°, bám Hale
-  ui/                    menu, hội thoại (chân dung concept), túi đồ, bản đồ, HUD, cảnh cắt
-  assets/                model .glb, texture, chân dung, nhạc .ogg, font tiếng Việt
-  tests/run.gd           chạy mọi test headless
+  project.godot            cấu hình Godot (main scene: res://src/game.tscn)
+  src/                     CODE GAME (chỉ thứ này được đóng gói vào .exe)
+    game.gd, game.tscn       nối core ↔ view ↔ ui, bàn phím
+    core/                    TẦNG LUẬT CHƠI, logic thuần, không đụng node 3D
+      level_data.gd            đọc data/ (màn, thuộc tính ô, chuỗi)
+      grid_state.gd            trạng thái màn: vị trí, túi đồ, ô, đèn, cờ sự kiện
+      light_field.gd           độ sáng 0..7 từng ô (chuyển từ method_151/152)
+      rules_classic.gd         luật gốc (mất năng lượng trong tối...)
+      rules_enhanced.gd        (M4) luật Nâng cao, kế thừa luật gốc
+      script_vm.gd             bộ chạy kịch bản 31 lệnh gốc (+ lệnh ≥100 cho Nâng cao)
+      save_game.gd             (M2) lưu JSON vào user://
+    view/                    TẦNG HÌNH ẢNH 3D: level_builder, actor, lighting, camera_rig
+    ui/                      hội thoại, HUD, chân dung; (M2) menu, túi đồ, bản đồ
+  data/                    SINH TỰ ĐỘNG bởi tools/export_data.py, KHÔNG sửa tay
+  data_enhanced/           (M4) file bổ sung cho chế độ Nâng cao, SỬA TAY
+  assets/                  original/ (PNG gốc); (M3) model .glb, texture, nhạc .ogg, font
+  tests/                   TEST, không đóng gói
+    run.gd                   bộ chạy: tìm mọi tests/**/test_*.gd
+    lib/test_case.gd         lớp cha (eq, ok, tree)
+    unit/                    test core/ và dữ liệu, không cần cảnh 3D
+    integration/             chạy game.tscn headless, giả lập phím
+    parity/                  so với game gốc; fixtures/ = tuyến đi + trace ghi từ bản gốc
+  tools/                   CÔNG CỤ cho người làm, không phải test, không đóng gói
+    godot.ps1                tìm file Godot
+    test.ps1                 chạy test: .\tools\test.ps1 [unit|integration|parity]
+    export_data.py           file gốc → data/ (dùng lại tools/df2_decode.py, df2_lang.py)
+    record_parity.ps1        chạy game gốc ẩn theo tuyến, ghi trace vào tests/parity/fixtures/
+    snap.gd                  chụp ảnh một màn ra snap/ (bỏ qua git)
+  docs/                    specs/ thiết kế, plans/ kế hoạch
 ```
 
 ## 4. Tầng luật chơi (`core/`)

@@ -1,5 +1,5 @@
-extends "res://tests/test_base.gd"
-## So GridState/LightField với trace ghi từ game gốc (tools/parity.ps1). Không có trace thì in SKIP.
+extends "res://tests/lib/test_case.gd"
+## So GridState/LightField với trace ghi từ game gốc (tools/record_parity.ps1). Không có trace thì in SKIP.
 
 func _lines(path: String) -> Array:
 	if not FileAccess.file_exists(path):
@@ -10,12 +10,12 @@ func _lines(path: String) -> Array:
 	return out
 
 func test_level00_route_matches_original() -> void:
-	var trace := _lines("res://tests/parity/level00_trace.jsonl")
+	var trace := _lines("res://tests/parity/fixtures/level00_trace.jsonl")
 	if trace.is_empty():
-		print("SKIP: chưa có level00_trace.jsonl, chạy tools/parity.ps1 -level 0")
+		print("SKIP: chưa có level00_trace.jsonl, chạy tools/record_parity.ps1 -level 0")
 		return
-	var F: Dictionary = LevelData.read_json("res://tools/parity_fields.json")
-	var route: Dictionary = LevelData.read_json("res://tests/parity/level00_route.json")
+	var F: Dictionary = LevelData.read_json("res://tests/parity/fixtures/fields.json")
+	var route: Dictionary = LevelData.read_json("res://tests/parity/fixtures/level00_route.json")
 	var s := GridState.new(LevelData.load_level(0), Vector2i(int(route.spawn[0]), int(route.spawn[1])))
 	eq(s.max_energy, int(trace[0][F.max_energy]), "năng lượng tối đa mặc định")
 	eq(s.energy, int(trace[0][F.energy]), "năng lượng đầu màn")

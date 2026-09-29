@@ -1,4 +1,4 @@
-extends "res://tests/test_base.gd"
+extends "res://tests/lib/test_case.gd"
 
 func test_frame_lookup() -> void:
 	var f := Portraits.frame(171)

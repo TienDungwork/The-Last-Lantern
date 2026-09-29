@@ -14,7 +14,7 @@ func _initialize() -> void:
 			out = args[i + 1]
 		if args[i] == "--steps":
 			steps = Array(args[i + 1].split(",")).map(func(v): return int(v))
-	var game: Node = load("res://game.tscn").instantiate()
+	var game: Node = load("res://src/game.tscn").instantiate()
 	game.start_level = level
 	root.add_child(game)
 	for i in 10:

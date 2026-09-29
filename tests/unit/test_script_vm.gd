@@ -1,4 +1,4 @@
-﻿extends "res://tests/test_base.gd"
+extends "res://tests/lib/test_case.gd"
 
 func _say_ids(out: Array) -> Array:
 	var r := []

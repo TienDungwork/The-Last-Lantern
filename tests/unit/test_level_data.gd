@@ -1,4 +1,4 @@
-extends "res://tests/test_base.gd"
+extends "res://tests/lib/test_case.gd"
 
 func test_load_level_0() -> void:
 	var L := LevelData.load_level(0)

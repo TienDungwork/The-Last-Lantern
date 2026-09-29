@@ -1,5 +1,5 @@
-# Chạy game gốc ẩn theo tuyến tests/parity/levelNN_route.json, ghi trace JSONL (lệnh R của AutoPlay) cạnh file tuyến.
-# Dùng: .\tools\parity.ps1 -level 0     rồi: godot --headless -s res://tests/run.gd
+# Chạy game gốc ẩn theo tuyến tests/parity/fixtures/levelNN_route.json, ghi trace JSONL (lệnh R của AutoPlay) cạnh file tuyến.
+# Dùng: .\tools\record_parity.ps1 -level 0     rồi: .\tools\test.ps1 parity
 # Cần df2_desktop\qa (classes, test\AutoPlay có lệnh R, S_base.rms, L.rms.bak). Thư mục chạy: qa\parity\NN (ngoài repo).
 param([int]$level = 0)
 $ErrorActionPreference = 'Stop'
@@ -7,8 +7,8 @@ $root = Split-Path $PSScriptRoot
 $qa = Join-Path (Split-Path $root) 'df2_desktop\qa'
 $jdk = (Get-ChildItem 'C:\Program Files\Eclipse Adoptium' -Directory | Select-Object -First 1).FullName
 $nn = '{0:d2}' -f $level
-$route = Get-Content "$root\tests\parity\level${nn}_route.json" -Raw | ConvertFrom-Json
-$trace = "$root\tests\parity\level${nn}_trace.jsonl"
+$route = Get-Content "$root\tests\parity\fixtures\level${nn}_route.json" -Raw | ConvertFrom-Json
+$trace = "$root\tests\parity\fixtures\level${nn}_trace.jsonl"
 Remove-Item $trace -ErrorAction SilentlyContinue
 
 $w = Join-Path $qa "parity\$nn"

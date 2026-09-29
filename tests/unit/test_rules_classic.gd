@@ -1,4 +1,4 @@
-extends "res://tests/test_base.gd"
+extends "res://tests/lib/test_case.gd"
 
 func _dark_rules() -> RulesClassic:
 	var s := GridState.new(LevelData.load_level(0))
