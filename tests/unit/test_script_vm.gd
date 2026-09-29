@@ -51,13 +51,30 @@ func test_set_tile_and_light() -> void:
 	eq(int(s.lights[3].radius), 5, "SET_LIGHT radius")
 	eq(int(s.lights[3].on), 1, "SET_LIGHT bật đèn")
 
-func test_teleport_same_level_and_exit_door() -> void:
+func test_teleport_same_and_other_level() -> void:
 	var s := GridState.new(LevelData.load_level(0))
 	s.vm.run({"commands": [{"op": 6, "args": [3, 9, 0]}]})
 	eq(s.player, Vector2i(3, 9), "TELEPORT trong màn")
-	s.vm.run({"commands": [{"op": 16, "args": [4, 13, 5]}]})
-	eq(s.out.back().type, "change_level", "exit_door sang màn khác")
-	eq(s.out.back().level, 5, "màn 5")
+	s.vm.run(s.events[67])   # (15,21): PLAYER_CONTROL on, SPECIAL, TELEPORT (13,6) màn 14
+	eq(s.out.back().type, "change_level", "TELEPORT sang màn khác")
+	eq(s.out.back().level, 14, "màn 14 (phố Ashwood)")
+	eq(s.out.back().to, Vector2i(13, 6), "vị trí đến")
+
+func test_counter_counts_down() -> void:
+	# COUNTER 3: hai lần đầu hủy (3->2->1), lần ba chạy tiếp.
+	var s := GridState.new(LevelData.load_level(0))
+	var e := {"commands": [{"op": 18, "args": [3]}, {"op": 2, "args": [10, 255, 255]}]}
+	eq(s.vm.run(e), false, "lần 1 hủy")
+	eq(s.vm.run(e), false, "lần 2 hủy")
+	eq(s.vm.run(e), true, "lần 3 chạy")
+	eq(s.out.size(), 1, "chỉ lần 3 nói")
+
+func test_map_markers() -> void:
+	var s := GridState.new(LevelData.load_level(0))
+	s.vm.run({"commands": [{"op": 4, "args": [170]}]})
+	eq(s.world.map_markers.has(170), true, "bật điểm 170")
+	s.vm.run({"commands": [{"op": 5, "args": [170]}]})
+	eq(s.world.map_markers.has(170), false, "tắt điểm 170")
 
 func test_enable_call_take_and_unknown() -> void:
 	var s := GridState.new(LevelData.load_level(0))

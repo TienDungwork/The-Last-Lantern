@@ -20,7 +20,9 @@ func _initialize() -> void:
 	for i in 10:
 		await process_frame
 	for d in steps:
-		game._handle(game.state.step(d))
+		var ev: Array = game.state.step(d).duplicate()
+		game.state.out.clear()
+		game._handle(ev)
 		for i in 15:
 			await process_frame
 	for i in 20:

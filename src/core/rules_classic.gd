@@ -18,14 +18,12 @@ func _init(state: GridState, seed_value: int = 0) -> void:
 	refresh_light()
 
 func refresh_light() -> void:
-	light = LightField.compute(s)
-
-func is_lit(p: Vector2i) -> bool:
-	# ponytail: bản gốc (method_132) lấy sáng từ ô cạnh khi đứng trên vật thể; M2 thêm khi có hộp/cửa.
-	return s.in_bounds(p) and light[p.y][p.x] > 0
+	s.light = []
+	light = s.light_map()
 
 func tick(dt_ms: int) -> void:
-	if is_lit(s.player):
+	light = s.light_map()   # GridState xóa bản đồ khi ô/đèn đổi; tính lại khi cần
+	if s.is_lit(s.player):
 		if dark_timer >= 0:
 			dark_timer = -2
 		return

@@ -6,6 +6,10 @@ func test_hold_key_walks_continuously() -> void:
 	var game: Node = load("res://src/game.tscn").instantiate()
 	tree.root.add_child(game)
 	await tree.process_frame
+	while game.dialog.visible:   # thoại mở đầu màn 0 (sự kiện on-enter)
+		game.dialog.hide()
+		game.dialog.closed.emit()
+		await tree.process_frame
 	Input.action_press("move_down")
 	await tree.create_timer(1.0).timeout
 	Input.action_release("move_down")
