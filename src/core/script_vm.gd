@@ -144,7 +144,10 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 		27:
 			st.out.append({"type": "actor_config", "mode": int(a[0]), "slot": int(a[1]), "args": a.slice(2)})
 		30:
-			st.out.append({"type": "special", "code": int(a[0])})
+			match int(a[0]):
+				2: st.spawn_boss(Vector2i(int(e.x), int(e.y)))
+				8: st.boss = {}
+				_: st.out.append({"type": "special", "code": int(a[0])})
 		_:
 			if op in TODO_OPS:
 				st.out.append({"type": "todo", "op": op, "args": a})

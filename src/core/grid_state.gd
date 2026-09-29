@@ -23,6 +23,9 @@ const CREATURE_TILE_MS := 200        # method_236: sinh vật đi 1 ô mất 200
 const CREATURE_HP_MS := 1000         # ở trong sáng đủ chừng này ms thì chết
 const NO_CREATURE_LEVELS := [14, 15] # class_10 dòng 1652: phố và sân trước nhà Benjamin không có sinh vật
 enum { C_WAIT = 1, C_MOVING = 2, C_DYING = 3, C_DECIDE = 4 }   # field_481
+const BOSS_TILE_MS := 800            # method_196: boss đi 1 ô mất 800 ms
+const BOSS_HP := 25600
+const BOSS_SIGHT := 10               # nửa ô (= 5 ô)
 
 var level: LevelData
 var world: World
@@ -41,6 +44,9 @@ var guards: Array = []
 ## {pos, from, to: Vector2i, dir, state, hp (ms còn chịu sáng), timer, age (ms, cho hoạt ảnh)}
 var creatures: Array = []
 var clock_ms := 0                # thời gian chơi trong màn (field_187), để sinh sinh vật mỗi giây
+## Boss 1 (SPECIAL 2, field_377..396), rỗng = không có. pos tính bằng 1/BOSS_TILE_MS ô.
+## {home, tile, next, goal: Vector2i, pos, hp, dying, timer, hit_ago}
+var boss: Dictionary = {}
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2
@@ -94,9 +100,22 @@ func is_solid(p: Vector2i) -> bool:
 	return t >= 8 and int(LevelData.tile_props(t).solid) == 1
 
 func is_blocked(p: Vector2i) -> bool:
-	## method_93: ngoài bản đồ, có hộp, hoặc ô solid. Người chơi không tính (kéo hộp vào chỗ mình đứng).
-	# ponytail: bản gốc còn chặn ở ô actor (field_379..382); thêm khi có actor.
+	## method_93: ngoài bản đồ, có hộp, ô boss đang đứng / sắp tới, hoặc ô solid. Người chơi không tính.
+	if not boss.is_empty() and (p == boss.tile or p == boss.next):
+		return true
 	return not in_bounds(p) or boxes.has(p) or is_solid(p)
+
+func hurt() -> void:
+	energy -= 1
+	out.append({"type": "hurt", "energy": energy})
+	if energy <= 0:
+		out.append({"type": "death"})
+
+func run_special(code: int) -> void:
+	## method_202: chạy mọi sự kiện mở đầu bằng SPECIAL `code` (kể cả đang tắt).
+	for e in events:
+		if int(e.commands[0].op) == 30 and int(e.commands[0].args[0]) == code:
+			vm.run(e)
 
 func light_map() -> Array:
 	if light.is_empty():
@@ -387,6 +406,63 @@ func _flee(c: Dictionary, rng: RandomNumberGenerator) -> void:
 		c.state = C_MOVING
 		c.from = p
 		c.to = p + pick
+
+func spawn_boss(at: Vector2i) -> void:
+	boss = {"home": at, "tile": at, "next": at, "goal": at, "pos": at * BOSS_TILE_MS, "hp": BOSS_HP,
+		"dying": false, "timer": 0, "hit_ago": 1 << 30}
+
+func tick_boss(ms: int, rng: RandomNumberGenerator) -> void:
+	## method_196. Chạm người chơi: -1 năng lượng, tối đa mỗi 2 s. Đứng ô sáng >= 4 mất 4 máu/ms (hồi lại khi tối);
+	## hết máu thì gục, 5 s sau chạy SPECIAL 8. Tới ô mới: thấy người chơi trong 5 ô thì đuổi, không thì về chỗ cũ.
+	## Mỗi bước đi về đích (không vào ô sáng >= 5); không đi được thì bước ngẫu nhiên sang ô sáng < 4.
+	if boss.is_empty():
+		return
+	var b := boss
+	if b.dying:
+		b.timer += ms
+		if b.timer >= 5000:
+			run_special(8)
+		return
+	b.hit_ago += ms
+	var gap: Vector2i = (b.pos - player * BOSS_TILE_MS).abs()
+	if gap.x < BOSS_TILE_MS / 2 and gap.y < BOSS_TILE_MS / 2 and b.hit_ago > 2000:
+		b.hit_ago = 0
+		hurt()
+	if light_level(b.tile) >= 4:
+		b.hp -= ms * 4
+		if b.hp <= 0:
+			b.dying = true
+			b.timer = 0
+			return
+	else:
+		b.hp = mini(b.hp + ms * 4, BOSS_HP)
+	if b.tile == b.next:
+		var n: Vector2i = b.tile
+		var axis := rng.randi() % 2
+		for k in 2:
+			var diff: int = b.goal[axis] - n[axis]
+			if n == b.tile and diff != 0:
+				var q := n
+				q[axis] += signi(diff)
+				if not is_blocked(q):
+					n = q
+			axis = 1 - axis
+		if light_level(n) >= 5:
+			n = b.tile
+		if n == b.tile:
+			var r := Vector2i.ZERO
+			r[rng.randi() % 2] = 1 if rng.randi() % 2 else -1
+			if not is_blocked(n + r) and light_level(n + r) < 4:
+				n += r
+		b.next = n
+	var goal_pos: Vector2i = b.next * BOSS_TILE_MS
+	var left := absi((goal_pos - b.pos).x + (goal_pos - b.pos).y)
+	if ms < left:
+		b.pos += (goal_pos - b.pos).sign() * ms
+	else:
+		b.pos = goal_pos
+		b.tile = b.next
+		b.goal = player if sees(b.tile * 2, player * 2, BOSS_SIGHT) else b.home
 
 func sees(a: Vector2i, b: Vector2i, r: int) -> bool:
 	## method_153, nửa ô: a trong ô vuông bán kính r quanh b và đường từ b tới a không qua ô chắn sáng (kể cả hộp).

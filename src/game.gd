@@ -29,6 +29,7 @@ var _held: Array = []        # phím hướng đang giữ, phím nhấn sau cùn
 var _step_wait := 0.0        # giây còn lại trước khi được đi ô tiếp theo
 var _guard_views: Dictionary = {}     # slot tu sĩ -> ActorView
 var _creature_views: Dictionary = {}  # slot sinh vật -> ActorView
+var _boss_view: Dictionary = {}       # 0 -> ActorView khi có boss
 
 func _ready() -> void:
 	_setup_input()
@@ -85,7 +86,7 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 	rules = RulesClassic.new(state, randi())
 	builder.build(state)
 	actor.snap_to(state.player)
-	for views in [_guard_views, _creature_views]:
+	for views in [_guard_views, _creature_views, _boss_view]:
 		for v in views.values():
 			v.queue_free()
 		views.clear()
@@ -128,8 +129,16 @@ func _sync_entities() -> void:
 		var c = state.creatures[i]
 		var spr := _creature_views[i].get_child(0) as Sprite3D
 		spr.modulate.a = 1.0 - c.timer / 1000.0 if c.state == GridState.C_DYING else 1.0
+	var b := state.boss
+	_sync_list([] if b.is_empty() else [b], _boss_view, GridState.BOSS_TILE_MS, _make_boss_view)
+	if not b.is_empty():   # gục: mờ dần trong 5 s
+		(_boss_view[0].get_child(0) as Sprite3D).modulate.a = 1.0 - b.timer / 5000.0 if b.dying else 1.0
 
 func _sync_list(list: Array, views: Dictionary, unit: int, make: Callable) -> void:
+	for i in views.keys():
+		if i >= list.size():
+			views[i].queue_free()
+			views.erase(i)
 	for i in list.size():
 		var e = list[i]
 		if e == null:
@@ -142,7 +151,7 @@ func _sync_list(list: Array, views: Dictionary, unit: int, make: Callable) -> vo
 			builder.get_parent().add_child(views[i])
 		var view: ActorView = views[i]
 		view.position = Vector3(e.pos.x, 0, e.pos.y) / float(unit) * LevelBuilder.TILE
-		view.face(e.dir)
+		view.face(e.get("dir", 0))
 
 func _guard_view() -> ActorView:
 	var v := ActorView.new()
@@ -150,6 +159,14 @@ func _guard_view() -> ActorView:
 		var spr := LevelBuilder.sprite("ak_00")
 		spr.modulate = Color(1.0, 0.35, 0.3)   # ponytail: chưa có sprite tu sĩ áo đỏ, tô đỏ tạm ông lão ak_00
 		v.add_child(spr)
+	return v
+
+func _make_boss_view() -> ActorView:
+	var v := ActorView.new()
+	var spr := LevelBuilder.sprite("ak_01")   # ponytail: chưa có sprite boss, tô tối tạm người bán thịt ak_01
+	spr.modulate = Color(0.35, 0.2, 0.25)
+	spr.scale *= 1.4
+	v.add_child(spr)
 	return v
 
 func _creature_view() -> ActorView:
