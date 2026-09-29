@@ -23,6 +23,26 @@ func test_pointers_follow_dialog() -> void:
 	eq(game._pointer_views.keys(), [6], "hết thoại: mũi tên slot 6")
 	game.free()
 
+func test_cutscene_overlay_during_lines() -> void:
+	var game: Node = load("res://src/game.tscn").instantiate()
+	game.show_title = false
+	game.start_level = 2
+	tree.root.add_child(game)
+	await tree.process_frame
+	while game.dialog.visible:
+		game.dialog.hide()
+		game.dialog.closed.emit()
+	game.state.vm.run(game.state.events[18])   # màn 2: tranh 184 (khúc xương) + câu 56
+	var out: Array = game.state.out.duplicate()
+	game.state.out.clear()
+	game._handle(out)
+	ok(game._cutscene.visible and game.dialog.visible, "đang cảnh cắt: màn đen + thoại")
+	eq(game._cutscene.get_child(0).texture, Portraits.texture(184), "đúng tranh")
+	game.dialog.hide()
+	game.dialog.closed.emit()
+	ok(not game._cutscene.visible, "hết thoại: gỡ màn đen")
+	game.free()
+
 func test_boss_view_follows_core() -> void:
 	var game: Node = load("res://src/game.tscn").instantiate()
 	game.show_title = false

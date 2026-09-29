@@ -5,7 +5,7 @@ extends RefCounted
 ## Sự kiện chạy hết -> tắt nếu không có cờ repeat. Bị hủy giữa chừng (IF_HOLDING sai, COUNTER chưa tới,
 ## PICKUP trong tối) -> vẫn bật, lần sau chạy lại được.
 
-const TODO_OPS := [1, 12, 13]
+const TODO_OPS := [1, 12]
 const AUTOSAVE_LEVEL := 14   # phố Ashwood: vào màn và rời màn đều tự lưu (method_112)
 const PERSIST := 0x80
 const MARKER_GROUP_FRAME := 380   # op 4: bật một điểm nhóm 380 thì tắt các điểm 380 khác
@@ -100,6 +100,13 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			var want_not := (int(a[0]) & 0x80) != 0
 			if st.inventory.has(int(a[0]) & 0x7F) == want_not:
 				return false
+		13:
+			# method_209 case 13: cảnh cắt (màn giả 21) = màn đen, hình frame ở giữa phía trên, N câu thoại;
+			# xong thì chạy tiếp màn cũ (không nạp lại). Lệnh sau op 13 vẫn chạy ngay.
+			st.out.append({"type": "cutscene", "frame": _u16(int(a[0]), int(a[1]))})
+			for i in int(a[2]):
+				st.out.append({"type": "say", "text_id": int(a[3 + i]), "portrait": -1})
+			st.out.append({"type": "cutscene_end"})
 		15:
 			st.world.map_revealed.append(Vector2i(int(a[0]), int(a[1])))
 			st.out.append({"type": "map_reveal", "at": Vector2i(int(a[0]), int(a[1]))})

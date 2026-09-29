@@ -92,6 +92,16 @@ func test_enable_call_take_and_unknown() -> void:
 	eq(s.out[0].type, "todo", "lệnh chưa cài báo todo, không dừng")
 	eq(s.out[0].op, 12, "kèm mã lệnh")
 
+func test_cutscene_intro_then_continues() -> void:
+	# Op 13 (method_209 case 13): event#16 màn 16 = tranh 181 + 4 câu "Năm năm trước..." rồi vẫn chạy tiếp
+	# op 22 -> event#17 (khóa điều khiển, đi trái 3 ô).
+	var s := GridState.new(LevelData.load_level(16))
+	s.vm.run(s.events[16])
+	var seq := s.out.filter(func(o): return o.type in ["cutscene", "say", "cutscene_end"]).map(
+		func(o): return o.get("frame", o.get("text_id", "end")))
+	eq(seq, [181, 171, 172, 173, 174, "end"], "tranh, 4 câu, gỡ")
+	eq([s.control, s.player], [false, Vector2i(7, 5)], "lệnh sau op 13 vẫn chạy")
+
 func test_tutorial_pointers_in_order() -> void:
 	# Op 27 (method_219): mode 1 = mũi tên ở ô (x,y) chỉ hướng dir, mode 2 = nháy khung HUD số n, mode 0 = tắt.
 	# event#19 màn 0: nháy HUD 0 trong câu 17, tắt, câu 18, rồi mũi tên ở (14,16) chỉ trái vào hốc đèn.

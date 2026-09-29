@@ -24,6 +24,7 @@ var rig: CameraRig
 var dialog: DialogBox
 var hud: Hud
 var menu: Menu
+var _cutscene: ColorRect        # op 13: phủ màn đen + tranh
 var _say_queue: Array = []
 var _reload_after_dialog := false
 var _menu_in_game := false    # menu mở từ trong màn (không phải màn tiêu đề)
@@ -63,6 +64,11 @@ func _ready() -> void:
 	add_child(ui)
 	hud = Hud.new()
 	ui.add_child(hud)
+	_cutscene = ColorRect.new()
+	_cutscene.color = Color.BLACK
+	_cutscene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_cutscene.hide()
+	ui.add_child(_cutscene)
 	dialog = DialogBox.new()
 	ui.add_child(dialog)
 	dialog.closed.connect(_next_say)
@@ -146,6 +152,7 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 		views.clear()
 	_hud_slots.clear()
 	hud.highlight = -1
+	_set_cutscene(-1)
 	if n == ScriptVM.AUTOSAVE_LEVEL:
 		world.save_game(SAVE_PATH, n, state.player)
 	var out := state.enter().duplicate()
@@ -233,6 +240,17 @@ func _sprite_view(sprite: String, glow := false) -> ActorView:
 	v.add_child(spr)
 	return v
 
+## Op 13: màn đen, tranh minh hoạ ở giữa phía trên; hộp thoại vẫn nằm dưới. frame < 0: gỡ.
+func _set_cutscene(frame: int) -> void:
+	for c in _cutscene.get_children():
+		c.queue_free()
+	_cutscene.visible = frame >= 0
+	if frame >= 0:
+		var pic := Hud.icon(frame, 3)
+		_cutscene.add_child(pic)
+		pic.size = pic.custom_minimum_size
+		pic.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_KEEP_SIZE, 80)
+
 ## Op 27: mũi tên nằm trên sàn chỉ hướng dir, nhún qua lại; {hud} thì HUD nhấp nháy.
 func _set_pointer(slot: int, p) -> void:
 	if _pointer_views.has(slot):
@@ -285,7 +303,7 @@ func _handle(out: Array) -> void:
 				actor.face(o.dir)
 			"teleported":
 				actor.snap_to(o.to)
-			"say", "pointer":   # mũi tên bật/tắt giữa các câu thoại như bản gốc (kịch bản dừng ở mỗi câu)
+			"say", "pointer", "cutscene", "cutscene_end":   # áp đúng lúc giữa các câu thoại (kịch bản dừng ở mỗi câu)
 				_say_queue.append(o)
 			"box_moved":
 				builder.move_box(o.from, o.to)
@@ -305,9 +323,12 @@ func _handle(out: Array) -> void:
 		_next_say()
 
 func _next_say() -> void:
-	while not _say_queue.is_empty() and _say_queue[0].get("type") == "pointer":
+	while not _say_queue.is_empty() and _say_queue[0].get("type", "say") != "say":
 		var p: Dictionary = _say_queue.pop_front()
-		_set_pointer(p.slot, p.value)
+		match p.type:
+			"pointer": _set_pointer(p.slot, p.value)
+			"cutscene": _set_cutscene(p.frame)
+			"cutscene_end": _set_cutscene(-1)
 	if _say_queue.is_empty():
 		if _reload_after_dialog:
 			_reload_after_dialog = false
