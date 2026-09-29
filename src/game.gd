@@ -29,6 +29,7 @@ var hud: Hud
 var menu: Menu
 var _cutscene: ColorRect        # op 13: phủ màn đen + tranh
 var music: AudioStreamPlayer
+var _beam_view := Node3D.new()    # SPECIAL 0/1/3
 var music_track := -1
 var _say_queue: Array = []
 var _reload_after_dialog := false
@@ -62,6 +63,7 @@ func _ready() -> void:
 		fill.light_color = LightingView.WARM
 		fill.light_volumetric_fog_energy = 0.0
 		actor.add_child(fill)
+	world.add_child(_beam_view)
 	rig = CameraRig.new()
 	rig.target = actor
 	world.add_child(rig)
@@ -232,6 +234,27 @@ func _sync_entities() -> void:
 	var b2 := state.boss2
 	_sync_list([] if b2.is_empty() else [b2], _boss2_view, GridState.BOSS2_TILE, _sprite_view.bind("as_00"))
 	_sync_list(state.fireballs.map(func(p): return {"pos": p}), _fireball_views, 1, _sprite_view.bind("at_00", true))
+	if _beam_view.get_meta("beam", {}) != state.sun_beam:
+		_show_sun_beam(state.sun_beam)
+
+## SPECIAL 0/1/3: tia nắng chéo từ trên ô gốc xuống sàn 3 ô phía dưới (bức tượng), 1 hoặc 2 tia.
+func _show_sun_beam(b: Dictionary) -> void:
+	_beam_view.set_meta("beam", b)
+	for c in _beam_view.get_children():
+		c.queue_free()
+	for k in b.get("n", 0):
+		var from := LevelBuilder.world_pos(b.at, 2.5) + Vector3(-0.1 * k, 0, -0.5)
+		var to := LevelBuilder.world_pos(b.at + Vector2i(0, 3), 0.1)
+		var ray := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(0.05, 0.05, from.distance_to(to))
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = Color(1.0, 0.85, 0.3)
+		box.material = mat
+		ray.mesh = box
+		_beam_view.add_child(ray)
+		ray.look_at_from_position((from + to) / 2, to)
 
 func _sync_list(list: Array, views: Dictionary, unit: int, make: Callable) -> void:
 	for i in views.keys():

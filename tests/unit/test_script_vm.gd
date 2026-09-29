@@ -91,6 +91,30 @@ func test_enable_call_take_and_unknown() -> void:
 	var done: bool = s.vm.run({"commands": [{"op": 12, "args": [1]}, {"op": 3, "args": []}]})
 	eq([done, s.out[0].text_id, s.world.minigames], [false, 168, [1]], "minigame ẩn: câu 168, ghi nhận, dừng kịch bản")
 
+func test_statue_needs_two_sun_beams() -> void:
+	# Màn 2: event#26 (SPECIAL 4) chỉ ghép chìa khi có 2 tia nắng (SPECIAL 0 rồi 1) và đã đặt hết mảnh chìa.
+	var s := GridState.new(LevelData.load_level(2))
+	s.vm.run(s.events[26])
+	eq([s.out[0].get("text_id"), s.event_active[14]], [58, false], "chưa có tia: câu 58, dừng kịch bản")
+	s.vm.run(s.events[16])
+	eq(s.sun_beam, {"n": 1, "at": Vector2i(4, 1)}, "SPECIAL 0: một tia")
+	var special3 := {"x": 4, "y": 1, "flags": 0, "commands": [{"op": 30, "args": [3]}]}
+	s.vm.run(special3)
+	eq(s.sun_beam.n, 1, "SPECIAL 3 khi mới 1 tia: giữ nguyên")
+	s.vm.run(s.events[20])
+	eq(s.sun_beam.n, 2, "SPECIAL 1: hai tia")
+	s.vm.run(special3)
+	eq(s.sun_beam.n, 1, "SPECIAL 3: hạ 2 -> 1")
+	s.vm.run(s.events[20])
+	s.inventory.append(29)
+	s.vm.run(s.events[26])
+	eq(s.event_active[14], false, "còn cầm mảnh chìa: chưa ghép")
+	s.inventory.erase(29)
+	s.out.clear()
+	s.vm.run(s.events[26])
+	ok(s.event_active[14] and s.sun_beam.is_empty(), "đủ điều kiện: chạy tiếp, tắt tia")
+	ok(s.out.any(func(o): return o.type == "cutscene" and o.frame == 182), "cảnh ghép chìa khóa")
+
 func test_game_end_stats() -> void:
 	# SPECIAL 17 (method_217): câu 246 kèm thống kê + hạng, 245 mã thưởng, 247+g cho minigame đã tìm, rồi hết game.
 	var s := GridState.new(LevelData.load_level(0))

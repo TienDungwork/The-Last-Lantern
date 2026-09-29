@@ -54,6 +54,7 @@ var boss: Dictionary = {}
 var boss2: Dictionary = {}
 var fireballs: Array = []        # Vector2i, cục lửa đứng yên (SPECIAL 11)
 var pointers: Dictionary = {}    # op 27, slot -> {at, dir} (mũi tên) | {hud} (nháy HUD); mất khi vào màn
+var sun_beam: Dictionary = {}    # SPECIAL 0/1/3 (field_334/335/336): {n: số tia 1|2, at: ô gốc}; mất khi vào màn
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2

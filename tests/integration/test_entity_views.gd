@@ -41,6 +41,9 @@ func test_cutscene_overlay_during_lines() -> void:
 	game.dialog.hide()
 	game.dialog.closed.emit()
 	ok(not game._cutscene.visible, "hết thoại: gỡ màn đen")
+	game.state.sun_beam = {"n": 2, "at": Vector2i(4, 1)}
+	game._sync_entities()
+	eq(game._beam_view.get_child_count(), 2, "hai tia nắng")
 	game.free()
 
 func test_boss_view_follows_core() -> void:

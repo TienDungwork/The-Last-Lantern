@@ -175,6 +175,16 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			st.out.append({"type": "pointer", "slot": slot, "value": p})
 		30:
 			match int(a[0]):
+				0, 1, 3:   # field_334: tia nắng từ ô sự kiện chiếu xuống tượng (màn 2); 0: tắt/2 -> 1, 1: 1 -> 2, 3: 2 -> 1
+					var n: int = st.sun_beam.get("n", 0)
+					var want: Array = [[0, 2], [1], [], [2]][int(a[0])]
+					if n in want:
+						st.sun_beam = {"n": 2 if int(a[0]) == 1 else 1, "at": Vector2i(int(e.x), int(e.y))}
+				4:   # ghép chìa khóa: cần đủ 2 tia và đã đặt hết mảnh (không còn cầm món 29/32)
+					if st.sun_beam.get("n", 0) != 2 or st.inventory.has(29) or st.inventory.has(32):
+						st.out.append({"type": "say", "text_id": 58, "portrait": -1})
+						return false
+					st.sun_beam = {}   # ponytail: bản gốc chiếu hoạt cảnh tia sáng 6 s rồi mới tắt (field_341)
 				2: st.spawn_boss(Vector2i(int(e.x), int(e.y)))
 				8: st.boss = {}
 				10: st.spawn_boss2(Vector2i(int(e.x), int(e.y)))
