@@ -40,8 +40,14 @@ func _initialize() -> void:
 		game._handle(ev)
 		for i in 15:
 			await process_frame
-	if event >= 0:
+	if event >= 0:   # bỏ thoại/hiệu ứng đang chờ để thấy ngay kết quả sự kiện (vd. xoá màn)
+		game._say_queue.clear()
+		game.dialog.hide()
+		game._fx_wait = 0.0
 		game.state.vm.run(game.state.events[event])
+		var ev: Array = game.state.out.duplicate()
+		game.state.out.clear()
+		game._handle(ev)
 	for i in frames:
 		await process_frame
 	var path := ProjectSettings.globalize_path("res://").path_join(out)

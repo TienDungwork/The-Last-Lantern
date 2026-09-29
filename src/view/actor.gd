@@ -74,21 +74,25 @@ func face(dir: int) -> void:
 		s.flip_h = dir == 1
 
 ## SPECIAL 15/16 (method_105, field_145..148): nằm xuống 0.2 s rồi nằm yên; đứng dậy sau 1.5 s nằm, 1.3 s nhổm lên.
-## Kiểu B: ngả sprite nằm ngang (bỏ kéo cao bù góc nhìn khi nằm).
+## Kiểu B: sprite nằm phẳng trên sàn, đầu về phía tây (nằm phẳng thì không cần kéo cao bù góc nhìn).
 func lie(lying: bool) -> float:
 	var s := get_child(0) as Sprite3D
 	if s == null:
 		return 0.0
-	var up_scale := 1.0 / cos(deg_to_rad(LevelBuilder.B_PITCH))
+	var flat := Vector3(-PI / 2, PI / 2, 0)
+	var up_scale := Vector3(1.0, 1.0 / cos(deg_to_rad(LevelBuilder.B_PITCH)), 1.0)
 	var tw := create_tween().set_parallel()
 	if lying:
-		tw.tween_property(s, "rotation:z", PI / 2, 0.2)
-		tw.tween_property(s, "scale:y", 1.0, 0.2)
+		tw.tween_property(s, "rotation", flat, 0.2)
+		tw.tween_property(s, "scale", Vector3.ONE, 0.2)
+		tw.tween_property(s, "position:y", 0.02, 0.2)
 		return 1.7
-	s.rotation.z = PI / 2
-	s.scale.y = 1.0
-	tw.tween_property(s, "rotation:z", 0.0, 1.3).set_delay(1.5)
-	tw.tween_property(s, "scale:y", up_scale, 1.3).set_delay(1.5)
+	s.rotation = flat
+	s.scale = Vector3.ONE
+	s.position.y = 0.02
+	tw.tween_property(s, "rotation", Vector3.ZERO, 1.3).set_delay(1.5)
+	tw.tween_property(s, "scale", up_scale, 1.3).set_delay(1.5)
+	tw.tween_property(s, "position:y", 0.0, 1.3).set_delay(1.5)
 	return 2.8
 
 func set_anim(anim: String) -> void:
