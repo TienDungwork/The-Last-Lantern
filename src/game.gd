@@ -47,6 +47,14 @@ func _ready() -> void:
 	lighting.setup_environment()
 	actor = ActorView.new()
 	world.add_child(actor)
+	if LevelBuilder.art == "B":   # đèn phụ chỉ để nhìn rõ nhân vật; không ảnh hưởng luật sáng/tối của core
+		var fill := OmniLight3D.new()
+		fill.position.y = 1.0
+		fill.omni_range = 2.0
+		fill.light_energy = 0.9
+		fill.light_color = LightingView.WARM
+		fill.light_volumetric_fog_energy = 0.0
+		actor.add_child(fill)
 	rig = CameraRig.new()
 	rig.target = actor
 	world.add_child(rig)
