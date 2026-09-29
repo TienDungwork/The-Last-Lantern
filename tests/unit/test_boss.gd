@@ -55,6 +55,44 @@ func test_burns_in_light_then_special_8() -> void:
 	eq(s.tile_at(Vector2i(3, 5)), 0, "event#14 mở lối (3,5)")
 	eq(s.energy, s.max_energy, "event#14 hồi năng lượng")
 
+## Boss 2 (SPECIAL 10/11/12), method_199/200. Màn 14: event#107 (3,19) thả, #118..120 lửa cột 20, #121 khi chết.
+
+func _street(player: Vector2i) -> GridState:
+	var s := GridState.new(LevelData.load_level(14), player)
+	s.vm.run(s.events[107])
+	return s
+
+func test_boss2_sweeps_right_and_kills_behind() -> void:
+	var s := _street(Vector2i(10, 19))
+	var rng := _rng()
+	s.tick_boss2(100, rng)
+	eq(s.energy, s.max_energy, "người ở trước mặt: an toàn")
+	for i in 30:
+		s.tick_boss2(100, rng)
+	eq(s.boss2.pos.x / GridState.BOSS2_TILE, 4, "3 s (5/3 px<<8 mỗi ms): qua 1 ô")
+	s.player = Vector2i(5, 18)
+	s.tick_boss2(100, rng)
+	eq(s.energy, 0, "người ở cột trước mặt boss hoặc sau nó: chết (mọi hàng)")
+
+func test_boss2_fireball_kills() -> void:
+	var s := _street(Vector2i(20, 19))
+	s.step(1)
+	s.step(3)   # bước vào (20,19) chạy event#119: SPECIAL 11 thả lửa ngay ô đó
+	eq(s.fireballs, [Vector2i(20, 19)], "có lửa")
+	s.tick_boss2(100, _rng())
+	eq(s.energy, 0, "đứng trên lửa: chết")
+
+func test_boss2_eats_lamps_then_special_12() -> void:
+	var s := _street(Vector2i(15, 19))
+	var rng := _rng()
+	for i in 4:   # 4 đèn mang được đặt ngay cột trước mặt, mỗi đèn -6400 máu và tắt
+		var L: Dictionary = s.lights[i]
+		L.merge({"x": 4, "y": 19, "type": 0, "on": 1, "radius": 2}, true)
+	s.tick_boss2(100, rng)
+	eq(int(s.lights[0].on), 0, "đèn bị dập")
+	ok(s.boss2.is_empty(), "hết máu: event#121 SPECIAL 12 gỡ boss")
+	eq(s.event_active[118], false, "event#121 tắt lửa")
+
 func test_chases_visible_player() -> void:
 	var s := GridState.new(LevelData.load_level(3), Vector2i(6, 8))
 	s.spawn_boss(Vector2i(10, 8))

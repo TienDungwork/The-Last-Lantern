@@ -30,6 +30,8 @@ var _step_wait := 0.0        # giây còn lại trước khi được đi ô ti�
 var _guard_views: Dictionary = {}     # slot tu sĩ -> ActorView
 var _creature_views: Dictionary = {}  # slot sinh vật -> ActorView
 var _boss_view: Dictionary = {}       # 0 -> ActorView khi có boss
+var _boss2_view: Dictionary = {}
+var _fireball_views: Dictionary = {}
 
 func _ready() -> void:
 	_setup_input()
@@ -86,7 +88,7 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 	rules = RulesClassic.new(state, randi())
 	builder.build(state)
 	actor.snap_to(state.player)
-	for views in [_guard_views, _creature_views, _boss_view]:
+	for views in [_guard_views, _creature_views, _boss_view, _boss2_view, _fireball_views]:
 		for v in views.values():
 			v.queue_free()
 		views.clear()
@@ -133,6 +135,9 @@ func _sync_entities() -> void:
 	_sync_list([] if b.is_empty() else [b], _boss_view, GridState.BOSS_TILE_MS, _make_boss_view)
 	if not b.is_empty():   # gục: mờ dần trong 5 s
 		(_boss_view[0].get_child(0) as Sprite3D).modulate.a = 1.0 - b.timer / 5000.0 if b.dying else 1.0
+	var b2 := state.boss2
+	_sync_list([] if b2.is_empty() else [b2], _boss2_view, GridState.BOSS2_TILE, _simple_view.bind("ae_00", 2.0))
+	_sync_list(state.fireballs.map(func(p): return {"pos": p}), _fireball_views, 1, _simple_view.bind("ad_14", 1.0))
 
 func _sync_list(list: Array, views: Dictionary, unit: int, make: Callable) -> void:
 	for i in views.keys():
@@ -166,6 +171,13 @@ func _make_boss_view() -> ActorView:
 	var spr := LevelBuilder.sprite("ak_01")   # ponytail: chưa có sprite boss, tô tối tạm người bán thịt ak_01
 	spr.modulate = Color(0.35, 0.2, 0.25)
 	spr.scale *= 1.4
+	v.add_child(spr)
+	return v
+
+func _simple_view(sprite: String, size: float) -> ActorView:   # ponytail: hình tạm cho boss 2 / lửa
+	var v := ActorView.new()
+	var spr := LevelBuilder.sprite(sprite)
+	spr.scale *= size
 	v.add_child(spr)
 	return v
 

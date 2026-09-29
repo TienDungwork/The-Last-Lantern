@@ -17,4 +17,13 @@ func test_boss_view_follows_core() -> void:
 	game.state.boss = {}
 	await tree.process_frame
 	eq(game._boss_view.size(), 0, "SPECIAL 8: gỡ hình")
+	game.state.player = Vector2i(14, 8)   # xa về bên phải để boss 2 không giết ngay
+	game.state.spawn_boss2(Vector2i(1, 8))
+	game.state.add_fireball(Vector2i(10, 8))
+	await tree.process_frame
+	eq([game._boss2_view.size(), game._fireball_views.size()], [1, 1], "boss 2 và lửa có hình")
+	game.state.boss2 = {}
+	game.state.fireballs.clear()
+	await tree.process_frame
+	eq([game._boss2_view.size(), game._fireball_views.size()], [0, 0], "SPECIAL 12: gỡ hình")
 	game.free()

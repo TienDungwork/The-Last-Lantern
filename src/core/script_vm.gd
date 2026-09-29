@@ -147,6 +147,11 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			match int(a[0]):
 				2: st.spawn_boss(Vector2i(int(e.x), int(e.y)))
 				8: st.boss = {}
+				10: st.spawn_boss2(Vector2i(int(e.x), int(e.y)))
+				11: st.add_fireball(Vector2i(int(e.x), int(e.y)))
+				12:
+					st.boss2 = {}
+					st.fireballs.clear()
 				_: st.out.append({"type": "special", "code": int(a[0])})
 		_:
 			if op in TODO_OPS:

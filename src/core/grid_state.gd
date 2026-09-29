@@ -26,6 +26,9 @@ enum { C_WAIT = 1, C_MOVING = 2, C_DYING = 3, C_DECIDE = 4 }   # field_481
 const BOSS_TILE_MS := 800            # method_196: boss đi 1 ô mất 800 ms
 const BOSS_HP := 25600
 const BOSS_SIGHT := 10               # nửa ô (= 5 ô)
+const BOSS2_TILE := 4096             # method_199 tính bằng pixel<<8: 1 ô = 16 px
+const BOSS2_LAMP_DAMAGE := 6400      # 4 đèn là hết máu
+const FIREBALL_SLOTS := 3            # field_403
 
 var level: LevelData
 var world: World
@@ -47,6 +50,9 @@ var clock_ms := 0                # thời gian chơi trong màn (field_187), đ�
 ## Boss 1 (SPECIAL 2, field_377..396), rỗng = không có. pos tính bằng 1/BOSS_TILE_MS ô.
 ## {home, tile, next, goal: Vector2i, pos, hp, dying, timer, hit_ago}
 var boss: Dictionary = {}
+## Boss 2 (SPECIAL 10, field_397..407), rỗng = không có. {pos: Vector2i (BOSS2_TILE/ô), target_y, lane, hp}
+var boss2: Dictionary = {}
+var fireballs: Array = []        # Vector2i, cục lửa đứng yên (SPECIAL 11)
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2
@@ -463,6 +469,51 @@ func tick_boss(ms: int, rng: RandomNumberGenerator) -> void:
 		b.pos = goal_pos
 		b.tile = b.next
 		b.goal = player if sees(b.tile * 2, player * 2, BOSS_SIGHT) else b.home
+
+func spawn_boss2(at: Vector2i) -> void:
+	boss2 = {"pos": at * BOSS2_TILE, "target_y": at.y * BOSS2_TILE, "lane": at.y, "hp": BOSS_HP}
+
+func add_fireball(at: Vector2i) -> void:
+	if fireballs.size() < FIREBALL_SLOTS:   # method_200: hết chỗ thì bỏ
+		fireballs.append(at)
+
+func tick_boss2(ms: int, rng: RandomNumberGenerator) -> void:
+	## method_199. Người chơi ở cột ngay trước mặt boss hoặc sau nó (mọi hàng), hoặc đứng trên lửa: chết.
+	## Đèn mang được (loại 0/1/2) đang sáng ở ô ngay trước mặt: boss -6400 máu, đèn tắt, có thể đổi làn ±1.
+	## Hết máu thì chạy SPECIAL 12. Đang ở đúng làn đích thì trôi sang phải, không thì trượt dọc về làn đích.
+	if boss2.is_empty():
+		return
+	var b := boss2
+	var front := Vector2i(b.pos.x / BOSS2_TILE + 1, b.pos.y / BOSS2_TILE)
+	if player.x <= front.x or player in fireballs:
+		if energy > 0:
+			energy = 0
+			out.append({"type": "death"})
+		return
+	for i in lights.size():
+		var L: Dictionary = lights[i]
+		if int(L.on) == 0 or int(L.radius) <= 0 or int(L.type) in [4, 5, 6]:
+			continue
+		if int(L.x) != front.x or int(L.y) != front.y:
+			continue
+		b.hp -= BOSS2_LAMP_DAMAGE
+		L.on = 0
+		light = []
+		out.append({"type": "light_changed", "light": i})
+		if b.pos.y == b.target_y:
+			if front.y == b.lane:
+				match rng.randi() % 3:
+					0: b.target_y = (b.lane - 1) * BOSS2_TILE
+					2: b.target_y = (b.lane + 1) * BOSS2_TILE
+			elif rng.randi() % 2 == 0:
+				b.target_y = b.lane * BOSS2_TILE
+	var v := ms * 5 / 3
+	if b.hp <= 0:
+		run_special(12)
+	elif b.pos.y == b.target_y:
+		b.pos.x += v
+	else:
+		b.pos.y = mini(b.pos.y + v, b.target_y) if b.pos.y < b.target_y else maxi(b.pos.y - v, b.target_y)
 
 func sees(a: Vector2i, b: Vector2i, r: int) -> bool:
 	## method_153, nửa ô: a trong ô vuông bán kính r quanh b và đường từ b tới a không qua ô chắn sáng (kể cả hộp).

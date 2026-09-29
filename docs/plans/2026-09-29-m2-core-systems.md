@@ -45,7 +45,7 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
      sự kiện cờ 64 với chính tu sĩ đó (op 8 = đi tiếp, op 6 = dịch chuyển / rời màn, op 22 chỉ truyền tu sĩ vào sự kiện
      cờ 64). Thấy người chơi trong 2 ô (`method_153`, bị vật chắn sáng che) mà không mặc Áo choàng tu sĩ (món 20)
      → năng lượng 0, câu 169. Áo choàng cũng chặn mất máu trong tối (`method_97`). `World.equipped` chờ UI túi đồ.
-   - ~~Sinh vật bóng tối~~ và ~~Boss 1~~ — xong (test `test_creatures.gd`, `test_boss.gd`). Vị trí chạm của boss so với
+   - ~~Sinh vật bóng tối~~, ~~Boss 1~~, ~~Boss 2~~ — xong (test `test_creatures.gd`, `test_boss.gd`). Vị trí chạm của boss so với
      ô người chơi (bản gốc so pixel khi người đang trượt giữa hai ô).
    - Sinh vật bóng tối (op 14 không bit 0x80, `method_233/236/237`): tối đa 16, tự sinh mỗi giây ở ô tối ngẫu nhiên
      (trừ màn 14, 15), chạy về ô tối nhất cạnh nó khi bị chiếu, ở trong sáng đủ 1000 ms thì chết (đếm `field_474`),
