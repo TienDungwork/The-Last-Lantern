@@ -22,7 +22,7 @@ COLORS = 48
 FLOOR_PX = 32  # sàn: 32x32 texel mỗi ô = LevelBuilder.TEXELS_PER_TILE, cùng cỡ pixel với sprite
 # Texture lát: vùng đặc (không trong suốt) trong sheet gốc; mirror=True lật gương 2x2 để liền mạch.
 TEXTURES = {
-    "tex_floor": ("aa", (74, 180, 190, 296), False),
+    "tex_floor": ("aa", (300, 170, 430, 300), False),  # dải đất có lá vàng
     "tex_wall": ("ab", (834, 471, 1354, 648), True),
 }
 

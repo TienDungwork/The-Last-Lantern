@@ -13,6 +13,7 @@ const TEXELS_PER_TILE := 32.0
 
 const ART_FENCE := "aa_14"      # vật chắn đường không chắn sáng, xếp thành hàng
 const ART_BOX := "aa_09"
+const ART_WALL := "aa_12"       # tường chắn sáng: cụm cọc sắt rộng đúng 1 ô
 const ART_DIM := ["ak_03", "ad_09", "ad_10"]
 const ART_PROPS := ["aa_19", "aa_20", "ai_02", "ak_05", "ao_01", "an_01", "al_01", "aa_10", "ad_02", "aa_08"]
 const FENCE_TILES := [92]
@@ -163,6 +164,11 @@ func _block(p: Vector2i, t: int) -> Node3D:
 	mi.position = world_pos(p, h / 2.0)
 	mi.material_override = mat
 	add_child(mi)
+	if wall and art == "B":   # hộp chỉ còn đổ bóng chắn đèn; hình là cọc sắt đứng như bản đồ 2D nhìn từ trên
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+		var s := sprite(ART_WALL)
+		s.position.y = -h / 2.0
+		mi.add_child(s)
 	return mi
 
 func _block_b(p: Vector2i, t: int, props: Dictionary) -> Node3D:

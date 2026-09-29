@@ -69,8 +69,8 @@ func setup_environment() -> void:
 	env.ambient_light_color = Color(0.2, 0.2, 0.3)
 	env.ambient_light_energy = 0.25
 	if LevelBuilder.art == "B":   # tối vẫn thấy lờ mờ nền; không glow (phủ mờ cả cảnh)
-		env.ambient_light_color = Color(0.3, 0.3, 0.36)
-		env.ambient_light_energy = 0.7
+		env.ambient_light_color = Color(0.55, 0.5, 0.45)
+		env.ambient_light_energy = 1.2
 		# Sương thể tích chỉ sáng nhờ đèn (không nhận ambient): quầng ấm quanh lửa, luồng sáng từ đèn chiếu.
 		# Sương cũng hút sáng dọc đường nhìn: dày quá thì cả cảnh tối theo.
 		env.volumetric_fog_enabled = true

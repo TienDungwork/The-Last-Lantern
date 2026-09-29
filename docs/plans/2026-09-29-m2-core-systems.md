@@ -19,7 +19,7 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
 | Op 24 | Hẹn giờ (method_213): 4 byte đối số = ms 32 bit, đếm lùi, về <= 0 thì chạy |
 | Op 25 | Hồi đầy năng lượng + câu 234 |
 | Op 10 | Kèm câu 238 "Bạn tìm thấy: %1" (tên món, chân dung = biểu tượng món) |
-| Cờ 128 | Chạy khi vào màn **và** khi đóng menu trong game (phím 6 -> ield_434), cần làm khi có menu |
+| Cờ 128 | Chạy khi vào màn **và** khi đóng menu trong game (phím 6 -> ield_434), xong cả hai (`game._on_menu_visibility`) |
 
 ## Phần A — xong
 
