@@ -1,0 +1,4 @@
+.godot/
+snap/
+export/
+*.import.tmp
