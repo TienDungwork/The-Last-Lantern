@@ -1,4 +1,4 @@
-# Chạy test. Dùng: .\tools\test.ps1            (tất cả)
+﻿# Chạy test. Dùng: .\tools\test.ps1            (tất cả)
 #                  .\tools\test.ps1 unit       (chỉ tests/unit; tương tự integration, parity)
 param([Parameter(ValueFromRemainingArguments)][string[]]$groups = @())
 $godot = & "$PSScriptRoot\godot.ps1"

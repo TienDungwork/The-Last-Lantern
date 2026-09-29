@@ -1,4 +1,4 @@
-# Chạy game gốc ẩn theo tuyến tests/parity/fixtures/levelNN_route.json, ghi trace JSONL (lệnh R của AutoPlay) cạnh file tuyến.
+﻿# Chạy game gốc ẩn theo tuyến tests/parity/fixtures/levelNN_route.json, ghi trace JSONL (lệnh R của AutoPlay) cạnh file tuyến.
 # Dùng: .\tools\record_parity.ps1 -level 0     rồi: .\tools\test.ps1 parity
 # Cần df2_desktop\qa (classes, test\AutoPlay có lệnh R, S_base.rms, L.rms.bak). Thư mục chạy: qa\parity\NN (ngoài repo).
 param([int]$level = 0)
