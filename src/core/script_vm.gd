@@ -142,7 +142,16 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 		26, 29:
 			pass   # kiểu trang trí, view đọc trực tiếp từ events khi dựng cảnh
 		27:
-			st.out.append({"type": "actor_config", "mode": int(a[0]), "slot": int(a[1]), "args": a.slice(2)})
+			# method_219: mũi tên hướng dẫn / khung nháy quanh HUD, không phải actor.
+			var slot := int(a[1])
+			var p = null
+			match int(a[0]):
+				0: st.pointers.erase(slot)
+				1: p = {"at": Vector2i(int(a[2]), int(a[4])), "dir": int(a[3])}
+				_: p = {"hud": int(a[2])}
+			if p != null:
+				st.pointers[slot] = p
+			st.out.append({"type": "pointer", "slot": slot, "value": p})
 		30:
 			match int(a[0]):
 				2: st.spawn_boss(Vector2i(int(e.x), int(e.y)))

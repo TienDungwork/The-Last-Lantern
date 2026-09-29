@@ -32,6 +32,8 @@ var _creature_views: Dictionary = {}  # slot sinh vật -> ActorView
 var _boss_view: Dictionary = {}       # 0 -> ActorView khi có boss
 var _boss2_view: Dictionary = {}
 var _fireball_views: Dictionary = {}
+var _pointer_views: Dictionary = {}   # slot op 27 -> mũi tên
+var _hud_slots: Dictionary = {}       # slot op 27 đang nháy HUD
 
 func _ready() -> void:
 	_setup_input()
@@ -88,10 +90,12 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 	rules = RulesClassic.new(state, randi())
 	builder.build(state)
 	actor.snap_to(state.player)
-	for views in [_guard_views, _creature_views, _boss_view, _boss2_view, _fireball_views]:
+	for views in [_guard_views, _creature_views, _boss_view, _boss2_view, _fireball_views, _pointer_views]:
 		for v in views.values():
 			v.queue_free()
 		views.clear()
+	_hud_slots.clear()
+	hud.highlight = false
 	var out := state.enter().duplicate()
 	state.out.clear()
 	_handle(out)
@@ -189,6 +193,32 @@ func _creature_view() -> ActorView:
 	v.add_child(spr)
 	return v
 
+## Op 27: mũi tên nằm trên sàn chỉ hướng dir, nhún qua lại; {hud} thì HUD nhấp nháy.
+func _set_pointer(slot: int, p) -> void:
+	if _pointer_views.has(slot):
+		_pointer_views[slot].queue_free()
+		_pointer_views.erase(slot)
+	if p != null and p.has("at"):
+		var node := Node3D.new()
+		node.rotation.y = {1: 0.0, 2: -PI / 2, 3: PI, 4: PI / 2}.get(p.dir, 0.0)
+		var spr := Sprite3D.new()
+		spr.texture = load("res://assets/new/aj_01.png")
+		spr.pixel_size = 1.0 / LevelBuilder.TEXELS_PER_TILE
+		spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		spr.rotation.x = -PI / 2
+		spr.position.y = 0.05
+		node.add_child(spr)
+		node.position = LevelBuilder.world_pos(p.at)
+		builder.get_parent().add_child(node)
+		var tw := node.create_tween().set_loops()
+		tw.tween_property(spr, "position:x", 0.25, 0.2)
+		tw.tween_property(spr, "position:x", -0.25, 0.2)
+		_pointer_views[slot] = node
+	_hud_slots.erase(slot)
+	if p != null and p.has("hud"):
+		_hud_slots[slot] = true
+	hud.highlight = not _hud_slots.is_empty()
+
 func _unhandled_input(ev: InputEvent) -> void:
 	# DialogBox (sâu hơn trong cây) nhận phím trước và đánh dấu handled khi đang mở.
 	if ev.is_action_pressed("interact") and not dialog.visible and _pending_level.is_empty() and not _reload_after_dialog:
@@ -206,7 +236,7 @@ func _handle(out: Array) -> void:
 				actor.face(o.dir)
 			"teleported":
 				actor.snap_to(o.to)
-			"say":
+			"say", "pointer":   # mũi tên bật/tắt giữa các câu thoại như bản gốc (kịch bản dừng ở mỗi câu)
 				_say_queue.append(o)
 			"box_moved":
 				builder.move_box(o.from, o.to)
@@ -224,6 +254,9 @@ func _handle(out: Array) -> void:
 		_next_say()
 
 func _next_say() -> void:
+	while not _say_queue.is_empty() and _say_queue[0].get("type") == "pointer":
+		var p: Dictionary = _say_queue.pop_front()
+		_set_pointer(p.slot, p.value)
 	if _say_queue.is_empty():
 		if _reload_after_dialog:
 			_reload_after_dialog = false

@@ -91,3 +91,13 @@ func test_enable_call_take_and_unknown() -> void:
 	s.vm.run({"commands": [{"op": 12, "args": [1]}]})
 	eq(s.out[0].type, "todo", "lệnh chưa cài báo todo, không dừng")
 	eq(s.out[0].op, 12, "kèm mã lệnh")
+
+func test_tutorial_pointers_in_order() -> void:
+	# Op 27 (method_219): mode 1 = mũi tên ở ô (x,y) chỉ hướng dir, mode 2 = nháy khung HUD số n, mode 0 = tắt.
+	# event#19 màn 0: nháy HUD 0 trong câu 17, tắt, câu 18, rồi mũi tên ở (14,16) chỉ trái vào hốc đèn.
+	var s := GridState.new(LevelData.load_level(0))
+	s.vm.run(s.events[19])
+	var seq := s.out.filter(func(o): return o.type in ["say", "pointer"]).map(
+		func(o): return o.text_id if o.type == "say" else [o.slot, o.value])
+	eq(seq, [[0, {"hud": 0}], 17, [0, null], 18, [6, {"at": Vector2i(14, 16), "dir": 3}]], "đúng thứ tự với thoại")
+	eq(s.pointers, {6: {"at": Vector2i(14, 16), "dir": 3}}, "trạng thái cuối")

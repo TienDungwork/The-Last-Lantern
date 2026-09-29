@@ -53,6 +53,7 @@ var boss: Dictionary = {}
 ## Boss 2 (SPECIAL 10, field_397..407), rỗng = không có. {pos: Vector2i (BOSS2_TILE/ô), target_y, lane, hp}
 var boss2: Dictionary = {}
 var fireballs: Array = []        # Vector2i, cục lửa đứng yên (SPECIAL 11)
+var pointers: Dictionary = {}    # op 27, slot -> {at, dir} (mũi tên) | {hud} (nháy HUD); mất khi vào màn
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2
