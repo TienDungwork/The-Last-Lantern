@@ -176,19 +176,19 @@ func _process(delta: float) -> void:
 
 ## Tu sĩ và sinh vật đi liên tục theo ms trong core; view chỉ chép vị trí mỗi khung hình.
 func _sync_entities() -> void:
-	_sync_list(state.guards, _guard_views, GridState.GUARD_TILE_MS, _guard_view)
-	_sync_list(state.creatures, _creature_views, GridState.CREATURE_TILE_MS, _creature_view)
+	_sync_list(state.guards, _guard_views, GridState.GUARD_TILE_MS, _sprite_view.bind("ap_00"))
+	_sync_list(state.creatures, _creature_views, GridState.CREATURE_TILE_MS, _sprite_view.bind("aq_00"))
 	for i in _creature_views:   # đang chết: mờ dần trong 1 s
 		var c = state.creatures[i]
 		var spr := _creature_views[i].get_child(0) as Sprite3D
 		spr.modulate.a = 1.0 - c.timer / 1000.0 if c.state == GridState.C_DYING else 1.0
 	var b := state.boss
-	_sync_list([] if b.is_empty() else [b], _boss_view, GridState.BOSS_TILE_MS, _make_boss_view)
+	_sync_list([] if b.is_empty() else [b], _boss_view, GridState.BOSS_TILE_MS, _sprite_view.bind("ar_00"))
 	if not b.is_empty():   # gục: mờ dần trong 5 s
 		(_boss_view[0].get_child(0) as Sprite3D).modulate.a = 1.0 - b.timer / 5000.0 if b.dying else 1.0
 	var b2 := state.boss2
-	_sync_list([] if b2.is_empty() else [b2], _boss2_view, GridState.BOSS2_TILE, _simple_view.bind("ae_00", 2.0))
-	_sync_list(state.fireballs.map(func(p): return {"pos": p}), _fireball_views, 1, _simple_view.bind("ad_14", 1.0))
+	_sync_list([] if b2.is_empty() else [b2], _boss2_view, GridState.BOSS2_TILE, _sprite_view.bind("as_00"))
+	_sync_list(state.fireballs.map(func(p): return {"pos": p}), _fireball_views, 1, _sprite_view.bind("at_00", true))
 
 func _sync_list(list: Array, views: Dictionary, unit: int, make: Callable) -> void:
 	for i in views.keys():
@@ -209,34 +209,12 @@ func _sync_list(list: Array, views: Dictionary, unit: int, make: Callable) -> vo
 		view.position = Vector3(e.pos.x, 0, e.pos.y) / float(unit) * LevelBuilder.TILE
 		view.face(e.get("dir", 0))
 
-func _guard_view() -> ActorView:
-	var v := ActorView.new()
-	if LevelBuilder.art == "B":
-		var spr := LevelBuilder.sprite("ak_00")
-		spr.modulate = Color(1.0, 0.35, 0.3)   # ponytail: chưa có sprite tu sĩ áo đỏ, tô đỏ tạm ông lão ak_00
-		v.add_child(spr)
-	return v
-
-func _make_boss_view() -> ActorView:
-	var v := ActorView.new()
-	var spr := LevelBuilder.sprite("ak_01")   # ponytail: chưa có sprite boss, tô tối tạm người bán thịt ak_01
-	spr.modulate = Color(0.35, 0.2, 0.25)
-	spr.scale *= 1.4
-	v.add_child(spr)
-	return v
-
-func _simple_view(sprite: String, size: float) -> ActorView:   # ponytail: hình tạm cho boss 2 / lửa
+## Sprite thực thể (tools/crop_sheets.py HEIGHT_BY_SHEET): ap tu sĩ, aq sinh vật, ar boss 1, as boss 2, at lửa.
+## glow: tự sáng, không bị bóng tối che.
+func _sprite_view(sprite: String, glow := false) -> ActorView:
 	var v := ActorView.new()
 	var spr := LevelBuilder.sprite(sprite)
-	spr.scale *= size
-	v.add_child(spr)
-	return v
-
-func _creature_view() -> ActorView:
-	var v := ActorView.new()
-	var spr := LevelBuilder.sprite("ae_01")   # ponytail: chưa có sprite sinh vật, dùng vệt bóng mờ phóng to
-	spr.modulate = Color(0.05, 0.0, 0.08)
-	spr.scale *= 3.0
+	spr.shaded = not glow
 	v.add_child(spr)
 	return v
 

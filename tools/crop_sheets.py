@@ -14,6 +14,10 @@ SRC, OUT = ROOT / "image" / "new", ROOT / "assets" / "new"
 CELL = 12  # gộp theo ô CELL px: các mảnh cách nhau < CELL px coi là một vật
 CELL_BY_SHEET = {"aa": 3, "ad": 3}  # sheet xếp sát nhau
 SMOOTH_SHEETS = {"ae"}  # vệt bóng mờ: giữ alpha chuyển dần
+# Sheet một nhân vật trên nền màu phẳng: thu về đúng chiều cao texel (32 texel = 1 ô) thay vì theo cỡ pixel giả.
+# ap tu sĩ áo đỏ, aq sinh vật bóng tối, ar boss 1, as boss 2, at cục lửa.
+HEIGHT_BY_SHEET = {"ap": 60, "aq": 38, "ar": 84, "as": 100, "at": 22}
+KEY_DIST = 90  # khoảng cách màu tới màu nền (góc ảnh) coi là nền
 COLORS = 48
 FLOOR_PX = 32  # sàn: 32x32 texel mỗi ô = LevelBuilder.TEXELS_PER_TILE, cùng cỡ pixel với sprite
 # Texture lát: vùng đặc (không trong suốt) trong sheet gốc; mirror=True lật gương 2x2 để liền mạch.
@@ -39,6 +43,17 @@ def pixel_size(img: Image.Image) -> int:
                     runs.append(c)
                 c = 1
     return int(min(np.percentile(runs, 75), 16)) if runs else 1
+
+
+def key_background(img: Image.Image) -> Image.Image:
+    """Ảnh AI không có alpha (nền một màu phẳng): màu gần màu góc ảnh -> trong suốt, kể cả lỗ kín giữa tay/chân."""
+    a = np.array(img)
+    if a[0, 0, 3] < 255:
+        return img
+    border = np.concatenate([a[0, :, :3], a[-1, :, :3], a[:, 0, :3], a[:, -1, :3]])
+    bg = np.median(border, axis=0)
+    a[np.linalg.norm(a[:, :, :3] - bg, axis=2) < KEY_DIST] = 0
+    return Image.fromarray(a)
 
 
 def to_native(img: Image.Image, px: float, smooth: bool = False) -> Image.Image:
@@ -87,12 +102,18 @@ def main() -> None:
     thumbs = []
     sizes = {}
     for sheet in sorted(SRC.glob("*.png")):
-        img = Image.open(sheet).convert("RGBA")
+        img = key_background(Image.open(sheet).convert("RGBA"))
         px = sizes[sheet.stem] = pixel_size(img)
-        for i, box in enumerate(components(np.array(img)[:, :, 3], CELL_BY_SHEET.get(sheet.stem, CELL))):
+        boxes = components(np.array(img)[:, :, 3], CELL_BY_SHEET.get(sheet.stem, CELL))
+        if sheet.stem in HEIGHT_BY_SHEET:  # một nhân vật: gộp mọi mảnh (tàn lửa, tua khói) thành một sprite
+            boxes = [img.getbbox()]
+        for i, box in enumerate(boxes):
             name = f"{sheet.stem}_{i:02d}"
             crop = img.crop(box)
-            crop = to_native(crop.crop(crop.getbbox()), px, sheet.stem in SMOOTH_SHEETS)
+            crop = crop.crop(crop.getbbox())
+            if sheet.stem in HEIGHT_BY_SHEET:
+                px = crop.height / HEIGHT_BY_SHEET[sheet.stem]
+            crop = to_native(crop, px, sheet.stem in SMOOTH_SHEETS)
             crop.save(OUT / f"{name}.png")
             thumbs.append((name, crop))
     size, cols = 160, 10
