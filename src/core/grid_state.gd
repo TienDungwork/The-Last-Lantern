@@ -222,6 +222,7 @@ func step(dir: int) -> Array:
 			vm.run(e)
 	else:
 		player = target
+		world.steps += 1   # field_139
 		out.append({"type": "moved", "to": player, "dir": dir})
 		if carried >= 0:
 			_carry_light(dir)

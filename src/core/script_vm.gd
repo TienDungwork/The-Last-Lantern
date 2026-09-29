@@ -1,11 +1,10 @@
 class_name ScriptVM
 extends RefCounted
 ## Chạy lệnh kịch bản của một sự kiện lên GridState. Xem class_10.method_207/208/209 (bản gốc)
-## và bảng đối số trong tools/df2_decode.py::disasm. Lệnh chưa cài -> out {"type":"todo"}.
+## và bảng đối số trong tools/df2_decode.py::disasm.
 ## Sự kiện chạy hết -> tắt nếu không có cờ repeat. Bị hủy giữa chừng (IF_HOLDING sai, COUNTER chưa tới,
 ## PICKUP trong tối) -> vẫn bật, lần sau chạy lại được.
 
-const TODO_OPS := [12]
 const AUTOSAVE_LEVEL := 14   # phố Ashwood: vào màn và rời màn đều tự lưu (method_112)
 const PERSIST := 0x80
 const MARKER_GROUP_FRAME := 380   # op 4: bật một điểm nhóm 380 thì tắt các điểm 380 khác
@@ -103,6 +102,13 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			var want_not := (int(a[0]) & 0x80) != 0
 			if st.inventory.has(int(a[0]) & 0x7F) == want_not:
 				return false
+		12:
+			# method_209 case 12: tìm thấy minigame ẩn (câu 168) rồi vào minigame; field_428 = 0 dừng kịch bản.
+			# ponytail: chưa làm 3 minigame (method_242/247/261, ~1000 dòng), chỉ ghi nhận đã tìm để hiện ở bảng cuối game.
+			if not st.world.minigames.has(int(a[0])):
+				st.world.minigames.append(int(a[0]))
+			st.out.append({"type": "say", "text_id": 168, "portrait": -1})
+			return false
 		13:
 			# method_209 case 13: cảnh cắt (màn giả 21) = màn đen, hình frame ở giữa phía trên, N câu thoại;
 			# xong thì chạy tiếp màn cũ (không nạp lại). Lệnh sau op 13 vẫn chạy ngay.
@@ -176,13 +182,19 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 				12:
 					st.boss2 = {}
 					st.fireballs.clear()
+				17:   # method_217 + field_121/122: bảng thống kê, mã thưởng, mã minigame đã tìm, hết game
+					var w := st.world
+					st.out.append({"type": "say", "text_id": 246, "portrait": -1, "args":
+						[w.play_time_text(), str(w.creatures_killed), str(w.steps), "0", "0", "0", w.grade()]})
+					st.out.append({"type": "say", "text_id": 245, "portrait": -1})
+					for g in [0, 1, 2]:   # 247 Darts, 248 Worm, 249 King Bong (thứ tự field_498/510/539)
+						if w.minigames.has(g):
+							st.out.append({"type": "say", "text_id": 247 + g, "portrait": -1})
+					st.out.append({"type": "game_end"})
 				18: st.out.append({"type": "autosave", "at": st.player})
 				_: st.out.append({"type": "special", "code": int(a[0])})
 		_:
-			if op in TODO_OPS:
-				st.out.append({"type": "todo", "op": op, "args": a})
-			else:
-				push_error("ScriptVM: mã lệnh lạ %d" % op)
+			push_error("ScriptVM: mã lệnh lạ %d" % op)
 	return true
 
 func _exec_actor(op: int, a: Array, i: int) -> void:

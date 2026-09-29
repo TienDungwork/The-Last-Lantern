@@ -324,7 +324,7 @@ func _handle(out: Array) -> void:
 				actor.face(o.dir)
 			"teleported":
 				actor.snap_to(o.to)
-			"say", "pointer", "cutscene", "cutscene_end":   # áp đúng lúc giữa các câu thoại (kịch bản dừng ở mỗi câu)
+			"say", "pointer", "cutscene", "cutscene_end", "game_end":   # áp đúng lúc giữa các câu thoại (kịch bản dừng ở mỗi câu)
 				_say_queue.append(o)
 			"box_moved":
 				builder.move_box(o.from, o.to)
@@ -339,8 +339,6 @@ func _handle(out: Array) -> void:
 			"death":
 				_say_queue.append({"text_id": 162, "portrait": -1})
 				_reload_after_dialog = true
-			"todo":
-				print("todo op %d %s" % [o.op, str(o.args)])
 	_refresh_light()
 	if not dialog.visible:
 		_next_say()
@@ -352,6 +350,9 @@ func _next_say() -> void:
 			"pointer": _set_pointer(p.slot, p.value)
 			"cutscene": _set_cutscene(p.frame)
 			"cutscene_end": _set_cutscene(-1)
+			"game_end":
+				_to_title()
+				return
 	if _say_queue.is_empty():
 		if _reload_after_dialog:
 			_reload_after_dialog = false

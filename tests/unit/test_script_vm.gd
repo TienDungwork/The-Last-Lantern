@@ -88,9 +88,29 @@ func test_enable_call_take_and_unknown() -> void:
 	s.vm.run({"commands": [{"op": 22, "args": [7]}]})
 	eq(s.inventory.has(0), true, "CALL_EVENT #7 nhặt Note 1")
 	s.out.clear()
-	s.vm.run({"commands": [{"op": 12, "args": [1]}]})
-	eq(s.out[0].type, "todo", "lệnh chưa cài báo todo, không dừng")
-	eq(s.out[0].op, 12, "kèm mã lệnh")
+	var done: bool = s.vm.run({"commands": [{"op": 12, "args": [1]}, {"op": 3, "args": []}]})
+	eq([done, s.out[0].text_id, s.world.minigames], [false, 168, [1]], "minigame ẩn: câu 168, ghi nhận, dừng kịch bản")
+
+func test_game_end_stats() -> void:
+	# SPECIAL 17 (method_217): câu 246 kèm thống kê + hạng, 245 mã thưởng, 247+g cho minigame đã tìm, rồi hết game.
+	var s := GridState.new(LevelData.load_level(0))
+	s.world.play_ms = 3723000
+	s.world.creatures_killed = 95
+	s.world.steps = 2000
+	s.world.minigames = [2]
+	s.vm.run({"flags": 0, "commands": [{"op": 30, "args": [17]}]})
+	eq(s.out.map(func(o): return o.get("text_id", o.type)), [246, 245, 249, "game_end"], "thứ tự")
+	eq(s.out[0].args, ["1h 2m 3s", "95", "2000", "0", "0", "0", "E"], "thống kê")
+
+func test_grade() -> void:
+	# method_218: giết 95 (>90: i=3) + đi 2000 (<2100: i=1) + 3 minigame 0 điểm (i=5 mỗi trò) = 19 -> (19+3)/5 = 4 -> "E"
+	var w := World.new()
+	w.creatures_killed = 95
+	w.steps = 2000
+	eq(w.grade(), "E", "giết 95, đi 2000")
+	w.creatures_killed = 250
+	w.steps = 100
+	eq(w.grade(), "D", "giết 250 (i=0), đi 100 (i=0) -> 15 -> (18)/5 = 3")
 
 func test_music_op() -> void:
 	var s := GridState.new(LevelData.load_level(3))

@@ -15,11 +15,42 @@ var map_markers: Dictionary = {} # id -> true (op 4/5, field_313)
 var map_revealed: Array = []     # Vector2i (op 15)
 var log: Array = []              # {type, level, id, x, y, value}
 var play_ms := 0                 # field_188, tổng thời gian chơi
+var steps := 0                   # field_139, "số mét đã đi" = số bước người chơi tự đi
+var minigames: Array = []        # op 12 đã tìm: 0 Semua Darts, 1 Lantern Worm, 2 King Bong (field_498/510/539)
+
+# method_218: ngưỡng xếp hạng. Điểm minigame luôn 0 (chưa làm minigame) -> mỗi trò cộng 5.
+const GRADE_KILLS := [200, 170, 130, 90, 50, -1]         # field_440, giết nhiều hơn -> tốt hơn
+const GRADE_STEPS := [1900, 2100, 2300, 2500, 2700, 100000]   # field_441, đi ít hơn -> tốt hơn
+const GRADE_DARTS := [45, 40, 35, 30, 25, -1]            # field_442
+const GRADE_BONG := [400, 300, 200, 150, 100, -100000]   # field_443
+const GRADE_WORM := [4000, 3500, 3000, 2500, 2000, -1]   # field_444
+
+func grade(darts := 0, bong := 0, worm := 0) -> String:
+	var g := 0
+	for i in 6:
+		if creatures_killed > GRADE_KILLS[i]:
+			g = i
+			break
+	for i in 6:
+		if steps < GRADE_STEPS[i]:
+			g += i
+			break
+	for pair in [[darts, GRADE_DARTS], [bong, GRADE_BONG], [worm, GRADE_WORM]]:
+		for i in 6:
+			if pair[0] > pair[1][i]:
+				g += i
+				break
+	return "ABCDEF"[mini((g + 3) / 5, 5)]
+
+func play_time_text() -> String:
+	var s := play_ms / 1000
+	return "%dh %dm %ds" % [s / 3600, s % 3600 / 60, s % 60]
 
 func save_game(path: String, level: int, at: Vector2i) -> void:
 	## method_112, dạng JSON. Không dùng var_to_str/str_to_var: file do người dùng giữ, chỉ đọc dữ liệu thuần.
 	var d := {"version": 1, "level": level, "x": at.x, "y": at.y, "inventory": inventory, "equipped": equipped,
 		"energy": energy, "max_energy": max_energy, "creatures_killed": creatures_killed, "play_ms": play_ms,
+		"steps": steps, "minigames": minigames,
 		"map_markers": map_markers.keys(), "map_revealed": map_revealed.map(func(p): return [p.x, p.y]), "log": log}
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
@@ -42,6 +73,8 @@ static func load_game(path: String) -> Dictionary:
 	w.max_energy = int(d.max_energy)
 	w.creatures_killed = int(d.creatures_killed)
 	w.play_ms = int(d.play_ms)
+	w.steps = int(d.get("steps", 0))
+	w.minigames = d.get("minigames", []).map(func(v): return int(v))
 	for k in d.map_markers:
 		w.map_markers[int(k)] = true
 	w.map_revealed = d.map_revealed.map(func(p): return Vector2i(int(p[0]), int(p[1])))

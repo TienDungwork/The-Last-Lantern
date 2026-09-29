@@ -48,6 +48,8 @@ func test_save_load_roundtrip() -> void:
 	w.max_energy = 5
 	w.creatures_killed = 7
 	w.play_ms = 123456
+	w.steps = 42
+	w.minigames = [0, 2]
 	w.map_markers = {4: true, 12: true}
 	w.map_revealed = [Vector2i(35, 29)]
 	w.log_change(World.SET_TILE, 3, 0, 3, 5, 0)
@@ -59,6 +61,7 @@ func test_save_load_roundtrip() -> void:
 	var w2: World = r.world
 	eq([w2.inventory, w2.equipped, w2.energy, w2.max_energy, w2.creatures_killed, w2.play_ms],
 		[[3, 20] as Array[int], 20, 2, 5, 7, 123456], "chỉ số")
+	eq([w2.steps, w2.minigames], [42, [0, 2]], "số bước, minigame đã tìm")
 	eq([w2.map_markers, w2.map_revealed], [{4: true, 12: true}, [Vector2i(35, 29)]], "bản đồ")
 	eq(w2.enter_level(3).tiles[5][3], 0, "sổ thay đổi áp lại được")
 	eq(World.load_game("user://khong_co.json"), {}, "không có file: rỗng")
