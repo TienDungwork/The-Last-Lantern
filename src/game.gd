@@ -34,7 +34,7 @@ var _boss_view: Dictionary = {}       # 0 -> ActorView khi có boss
 var _boss2_view: Dictionary = {}
 var _fireball_views: Dictionary = {}
 var _pointer_views: Dictionary = {}   # slot op 27 -> mũi tên
-var _hud_slots: Dictionary = {}       # slot op 27 đang nháy HUD
+var _hud_slots: Dictionary = {}       # slot op 27 -> chỉ số nhóm HUD đang nháy
 
 func _ready() -> void:
 	_setup_input()
@@ -96,7 +96,7 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 			v.queue_free()
 		views.clear()
 	_hud_slots.clear()
-	hud.highlight = false
+	hud.highlight = -1
 	if n == ScriptVM.AUTOSAVE_LEVEL:
 		world.save_game(SAVE_PATH, n, state.player)
 	var out := state.enter().duplicate()
@@ -229,8 +229,8 @@ func _set_pointer(slot: int, p) -> void:
 		_pointer_views[slot] = node
 	_hud_slots.erase(slot)
 	if p != null and p.has("hud"):
-		_hud_slots[slot] = true
-	hud.highlight = not _hud_slots.is_empty()
+		_hud_slots[slot] = int(p.hud)
+	hud.highlight = _hud_slots.values()[0] if not _hud_slots.is_empty() else -1
 
 func _unhandled_input(ev: InputEvent) -> void:
 	# DialogBox (sâu hơn trong cây) nhận phím trước và đánh dấu handled khi đang mở.
