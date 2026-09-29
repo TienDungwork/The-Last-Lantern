@@ -1025,7 +1025,7 @@ func test_dark_damage_after_2_to_3_seconds() -> void:
 	r.tick(1)          # bắt đầu đếm
 	r.tick(1_998)
 	eq(r.s.energy, r.s.max_energy, "chưa tới 2 s")
-	r.tick(1_001)      # tổng 3000 ms > 2999 tối đa
+	r.tick(1_002)      # tổng 3000 ms: bộ đếm tối đa 2999 xuống < 0
 	eq(r.s.energy, r.s.max_energy - 1, "mất 1 sau tối đa 3 s")
 	r.tick(1)
 	r.tick(3_000)
