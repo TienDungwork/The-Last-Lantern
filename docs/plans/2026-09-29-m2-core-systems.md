@@ -39,7 +39,19 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
 
 1. ~~Bóng đèn/đui (op 23), công tắc tường~~ — xong: đâm hốc sáng lấy bóng, hốc tối lắp bóng (`GridState.bulbs`,
    reset mỗi màn như `field_278`). Công tắc khung 63/52 bật-tắt đèn loại 5 ở hai bên rồi thành 62/53, chỉ gạt một lần.
-2. Actor: quái/tu sĩ (op 27), đạn (op 14).
+2. "Actor" — đọc code thì op 27 **không phải quái** mà là mũi tên hướng dẫn / khung nhấp nháy quanh HUD (`method_219`).
+   Có 4 loại thực thể động:
+   - ~~Tu sĩ (op 14 có bit 0x80, `method_231/232`)~~ — xong: tối đa 8, đi thẳng 400 ms/ô không va chạm, tới đích chạy
+     sự kiện cờ 64 với chính tu sĩ đó (op 8 = đi tiếp, op 6 = dịch chuyển / rời màn, op 22 chỉ truyền tu sĩ vào sự kiện
+     cờ 64). Thấy người chơi trong 2 ô (`method_153`, bị vật chắn sáng che) mà không mặc Áo choàng tu sĩ (món 20)
+     → năng lượng 0, câu 169. Áo choàng cũng chặn mất máu trong tối (`method_97`). `World.equipped` chờ UI túi đồ.
+   - Sinh vật bóng tối (op 14 không bit 0x80, `method_233/236/237`): tối đa 16, tự sinh mỗi giây ở ô tối ngẫu nhiên
+     (trừ màn 14, 15), chạy về ô tối nhất cạnh nó khi bị chiếu, ở trong sáng đủ 1000 ms thì chết (đếm `field_474`),
+     hộp đè lên thì mất. Không gây sát thương.
+   - Boss 1 (SPECIAL 2/8, `method_196`): máu 25600, đuổi khi thấy người chơi trong 5 ô, không vào ô sáng >= 5,
+     mất máu khi đứng ô sáng >= 4, chạm người chơi -1 năng lượng mỗi 2 s, chết -> 5 s -> chạy SPECIAL 8. Chặn đường.
+   - Boss 2 (SPECIAL 10/11/12, `method_199/200`, màn 14): trôi sang phải, đèn trước mặt làm nó mất 1/4 máu và tắt,
+     ai ở bên trái nó hoặc chạm cục lửa (SPECIAL 11) thì chết ngay; hết máu -> SPECIAL 12.
 4. Nhạc (op 1, MIDI→OGG), kết chương (op 13), minigame (op 12), special (op 30).
 5. Bản đồ thành phố, menu, lưu game (autosave rời màn 14).
 6. Parity route cho mỗi màn (`tools/record_parity.ps1`), kèm một route qua bàn đạp.

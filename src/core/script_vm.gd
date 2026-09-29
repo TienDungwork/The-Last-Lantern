@@ -5,7 +5,7 @@ extends RefCounted
 ## Sự kiện chạy hết -> tắt nếu không có cờ repeat. Bị hủy giữa chừng (IF_HOLDING sai, COUNTER chưa tới,
 ## PICKUP trong tối) -> vẫn bật, lần sau chạy lại được.
 
-const TODO_OPS := [1, 12, 13, 14]
+const TODO_OPS := [1, 12, 13]
 const PERSIST := 0x80
 const MARKER_GROUP_FRAME := 380   # op 4: bật một điểm nhóm 380 thì tắt các điểm 380 khác
 
@@ -18,10 +18,11 @@ static var _markers: Array = []
 func _init(state: GridState) -> void:
 	_s = weakref(state)
 
-func run(e: Dictionary) -> bool:
+func run(e: Dictionary, actor: int = -1) -> bool:
+	## actor >= 0: sự kiện do tu sĩ đó kích (field_432), lệnh 6/8 tác động lên tu sĩ thay vì người chơi.
 	var st := s
 	for c in e.commands:
-		if not _exec(e, int(c.op), c.args):
+		if not _exec(e, int(c.op), c.args, actor):
 			return false
 	if e.has("id") and not (int(e.flags) & GridState.F_REPEAT):
 		st.event_active[int(e.id)] = false
@@ -38,8 +39,11 @@ func _level_arg(v: int, type: int, id: int, x: int = 0, y: int = 0, value: int =
 		s.world.log_change(type, n, id, x, y, value)
 	return n == s.level.index
 
-func _exec(e: Dictionary, op: int, a: Array) -> bool:
+func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 	var st := s
+	if actor >= 0 and op in [6, 8]:
+		_exec_actor(op, a, actor)
+		return true
 	match op:
 		2:
 			st.out.append({"type": "say", "text_id": int(a[0]), "portrait": _u16(int(a[1]), int(a[2]))})
@@ -122,8 +126,14 @@ func _exec(e: Dictionary, op: int, a: Array) -> bool:
 		21:
 			if _level_arg(int(a[1]), World.DISABLE, int(a[0])):
 				st.event_active[int(a[0])] = false
-		22:
-			run(st.events[int(a[0])])
+		14:
+			if int(a[3]) & 0x80:
+				st.spawn_guard(Vector2i(int(a[0]), int(a[1])), int(a[2]), int(a[3]) & 0x7F)
+			else:
+				st.out.append({"type": "todo", "op": op, "args": a})
+		22:   # tu sĩ chỉ đi theo vào sự kiện cờ 64
+			var callee: Dictionary = st.events[int(a[0])]
+			run(callee, actor if int(callee.flags) & GridState.F_BY_ACTOR else -1)
 		23:
 			st.toggle_bulb(int(a[0]) & 0x7F)
 		25:   # method_209 case 25: hồi đầy năng lượng kèm câu 234
@@ -141,6 +151,22 @@ func _exec(e: Dictionary, op: int, a: Array) -> bool:
 			else:
 				push_error("ScriptVM: mã lệnh lạ %d" % op)
 	return true
+
+func _exec_actor(op: int, a: Array, i: int) -> void:
+	## method_209 case 6/8 khi field_432 >= 0.
+	var st := s
+	var g = st.guards[i]
+	if g == null:
+		return
+	if op == 6:
+		if int(a[2]) != st.level.index:
+			st.guards[i] = null
+		else:
+			g.to = Vector2i(int(a[0]), int(a[1]))
+			g.pos = g.to * GridState.GUARD_TILE_MS
+	else:
+		g.dir = int(a[0])
+		g.to = st.guard_tile(i) + GridState.DIR_VEC.get(g.dir, Vector2i.ZERO) * int(a[1])
 
 static func _marker_frame(id: int) -> int:
 	if _markers.is_empty():

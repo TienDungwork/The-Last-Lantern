@@ -7,6 +7,7 @@ extends RefCounted
 enum { ENABLE, DISABLE, SET_TILE, SET_LIGHT }
 
 var inventory: Array[int] = []
+var equipped := -1               # món đang trang bị (field_267[field_274]), -1 = không
 var max_energy: int = 4          # field_152
 var energy: int = 4
 var map_markers: Dictionary = {} # id -> true (op 4/5, field_313)

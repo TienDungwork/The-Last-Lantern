@@ -27,6 +27,7 @@ var _reload_after_dialog := false
 var _pending_level := {}       # change_level chờ đóng hết thoại rồi mới chuyển
 var _held: Array = []        # phím hướng đang giữ, phím nhấn sau cùng ở cuối (được ưu tiên)
 var _step_wait := 0.0        # giây còn lại trước khi được đi ô tiếp theo
+var _guard_views: Dictionary = {}   # slot tu sĩ -> ActorView
 
 func _ready() -> void:
 	_setup_input()
@@ -83,6 +84,9 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 	rules = RulesClassic.new(state, randi())
 	builder.build(state)
 	actor.snap_to(state.player)
+	for v in _guard_views.values():
+		v.queue_free()
+	_guard_views.clear()
 	var out := state.enter().duplicate()
 	state.out.clear()
 	_handle(out)
@@ -108,10 +112,32 @@ func _process(delta: float) -> void:
 		state.step(DIR_ACTION[_held.back()])   # step() xóa out cũ trước khi ghi
 		_step_wait = ActorView.STEP_TIME
 	rules.tick(int(delta * 1000.0))
+	_sync_guards()
 	if not state.out.is_empty():
 		var out := state.out.duplicate()
 		state.out.clear()
 		_handle(out)
+
+## Tu sĩ đi liên tục theo ms trong core; view chỉ chép vị trí mỗi khung hình.
+func _sync_guards() -> void:
+	for i in state.guards.size():
+		var g = state.guards[i]
+		if g == null:
+			if _guard_views.has(i):
+				_guard_views[i].queue_free()
+				_guard_views.erase(i)
+			continue
+		if not _guard_views.has(i):
+			var v := ActorView.new()
+			if LevelBuilder.art == "B":
+				var spr := LevelBuilder.sprite("ak_00")
+				spr.modulate = Color(1.0, 0.35, 0.3)   # ponytail: chưa có sprite tu sĩ áo đỏ, tô đỏ tạm ông lão ak_00
+				v.add_child(spr)
+			builder.get_parent().add_child(v)
+			_guard_views[i] = v
+		var view: ActorView = _guard_views[i]
+		view.position = Vector3(g.pos.x, 0, g.pos.y) / float(GridState.GUARD_TILE_MS) * LevelBuilder.TILE
+		view.face(g.dir)
 
 func _unhandled_input(ev: InputEvent) -> void:
 	# DialogBox (sâu hơn trong cây) nhận phím trước và đánh dấu handled khi đang mở.

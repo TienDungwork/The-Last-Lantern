@@ -14,6 +14,10 @@ const MOVE_FLAG := {1: 32, 2: 4, 3: 8, 4: 16}   # field_425[dir-1]
 # Sự kiện có lệnh đầu là 16 (bàn đạp), 24 (hẹn giờ), 28 (cảm biến sáng) không kích hoạt bằng cách đi vào (method_216).
 const SELF_DRIVEN_TYPES := [16, 24, 28]
 const OUT_OF_BOUNDS_TILE := 8 + 48   # 0x38, tường
+const GUARD_TILE_MS := 400           # method_231: tu sĩ đi 1 ô mất 400 ms
+const GUARD_SLOTS := 8
+const GUARD_SIGHT := 4               # nửa ô (= 2 ô)
+const CLOAK := 20                    # Áo choàng tu sĩ: tu sĩ không nhận ra, tối không mất máu
 
 var level: LevelData
 var world: World
@@ -25,6 +29,9 @@ var plate_saved: Dictionary = {} # event id bàn đạp đang mở -> ô cửa g
 var boxes: Dictionary = {}       # Vector2i -> ô hộp; tách khỏi lưới lúc nạp (field_204..206)
 var carried := -1                # chỉ số đèn đang cầm (field_149), -1 = tay không
 var bulbs := 0                   # bóng đèn đang có (field_278), riêng từng màn
+## Tu sĩ (op 14 bit 0x80, field_465..472): null = ô trống. pos tính bằng 1/GUARD_TILE_MS ô để đi mượt theo ms.
+## {pos: Vector2i, to: Vector2i, dir: int}
+var guards: Array = []
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2
@@ -112,14 +119,15 @@ func light_level(p: Vector2i) -> int:
 func is_lit(p: Vector2i) -> bool:
 	return light_level(p) > 0   # method_133
 
-func events_at(p: Vector2i, moving_dir: int, on_enter_only: bool = false) -> Array:
-	## method_216 cho người chơi. moving_dir 0 = không lọc hướng (đi vào ô, vào màn).
+func events_at(p: Vector2i, moving_dir: int, on_enter_only: bool = false, actor: int = -1) -> Array:
+	## method_216. moving_dir 0 = không lọc hướng (đi vào ô, vào màn). actor >= 0: chỉ sự kiện cờ 64 (của tu sĩ),
+	## actor = -1: chỉ sự kiện không có cờ 64 (của người chơi).
 	var r := []
 	for e in events:
 		if not event_active[int(e.id)] or int(e.commands[0].op) in SELF_DRIVEN_TYPES:
 			continue
 		var flags := int(e.flags)
-		if (on_enter_only and not (flags & F_ON_ENTER)) or (flags & F_BY_ACTOR):
+		if (on_enter_only and not (flags & F_ON_ENTER)) or bool(flags & F_BY_ACTOR) != (actor >= 0):
 			continue
 		if int(e.commands[0].op) == 10 and not is_lit(Vector2i(int(e.x), int(e.y))):
 			continue   # vật phẩm chỉ nhặt được khi ô sáng
@@ -230,6 +238,68 @@ func toggle_bulb(i: int) -> void:
 		return
 	light = []
 	out.append({"type": "light_changed", "light": i})
+
+func spawn_guard(at: Vector2i, dir: int, dist: int) -> void:
+	## method_232: lấy ô trống đầu tiên, đi thẳng `dist` ô theo `dir`.
+	var g := {"pos": at * GUARD_TILE_MS, "to": at + DIR_VEC.get(dir, Vector2i.ZERO) * dist, "dir": dir}
+	var i := guards.find(null)
+	if i >= 0:
+		guards[i] = g
+	elif guards.size() < GUARD_SLOTS:
+		guards.append(g)
+
+func guard_tile(i: int) -> Vector2i:
+	return guards[i].pos / GUARD_TILE_MS
+
+func tick_guards(ms: int) -> void:
+	## method_231: thấy người chơi (không mặc áo choàng) là bị bắt; đi tới đích thì chạy sự kiện cờ 64 ở đó.
+	var seen := false
+	for i in guards.size():
+		var g = guards[i]
+		if g == null:
+			continue
+		if world.equipped != CLOAK and sees(player * 2, guard_tile(i) * 2, GUARD_SIGHT):
+			seen = true
+		var goal: Vector2i = g.to * GUARD_TILE_MS
+		if g.pos == goal:
+			continue
+		var d := Vector2i(signi(goal.x - g.pos.x), 0)
+		if d.x == 0:
+			d.y = signi(goal.y - g.pos.y)
+		g.dir = {Vector2i(1, 0): 1, Vector2i(0, 1): 2, Vector2i(-1, 0): 3, Vector2i(0, -1): 4}[d]
+		var left := absi((goal - g.pos).x + (goal - g.pos).y)
+		if ms < left:
+			g.pos += d * ms
+		else:
+			g.pos = goal
+			for e in events_at(g.to, 0, false, i):
+				vm.run(e, i)
+	if seen and energy > 0:
+		energy = 0
+		out.append({"type": "say", "text_id": 169, "portrait": -1})
+		out.append({"type": "death"})
+
+func sees(a: Vector2i, b: Vector2i, r: int) -> bool:
+	## method_153, nửa ô: a trong ô vuông bán kính r quanh b và đường từ b tới a không qua ô chắn sáng (kể cả hộp).
+	var dx := absi(a.x - b.x)
+	var dy := absi(a.y - b.y)
+	if dx > r or dy > r:
+		return false
+	var sx := signi(a.x - b.x)
+	var sy := signi(a.y - b.y)
+	for i in maxi(dx, dy):
+		var p: Vector2i
+		if dx > dy:
+			p = Vector2i(b.x + i * sx, b.y + ((i * ((dy << 6) / dx)) >> 6) * sy)
+		elif dx < dy:
+			p = Vector2i(b.x + ((i * ((dx << 6) / dy)) >> 6) * sx, b.y + i * sy)
+		else:
+			p = b + Vector2i(i * sx, i * sy)
+		var q := p / 2
+		for t in [tile_at(q), boxes.get(q, 0)]:
+			if t >= 8 and int(LevelData.tile_props(t).blocks_light) == 1:
+				return false
+	return true
 
 func _light_index(p: Vector2i, type: int) -> int:
 	## method_142: đèn đầu tiên đúng loại ở ô p.

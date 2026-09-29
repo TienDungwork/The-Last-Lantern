@@ -22,10 +22,13 @@ func refresh_light() -> void:
 	light = s.light_map()
 
 func tick(dt_ms: int) -> void:
+	if s.energy <= 0:
+		return   # đã chết, chờ game.gd nạp lại màn
 	s.tick_timers(dt_ms)
+	s.tick_guards(dt_ms)
 	s.check_light_sensors()
 	light = s.light_map()   # GridState xóa bản đồ khi ô/đèn đổi; tính lại khi cần
-	if s.is_lit(s.player):
+	if s.is_lit(s.player) or s.world.equipped == GridState.CLOAK:
 		if dark_timer >= 0:
 			dark_timer = -2
 		return

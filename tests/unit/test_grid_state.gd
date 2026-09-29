@@ -227,8 +227,48 @@ func test_bulbs_are_per_level() -> void:
 	eq(s.bulbs, 1, "có bóng")
 	eq(w.enter_level(0).bulbs, 0, "vào lại màn: bóng về 0 (field_278 reset khi nạp màn)")
 
+func _tick_guards(s: GridState, ms: int) -> void:
+	for i in ms / 100:
+		s.tick_guards(100)
+
+func test_guard_patrol_follows_actor_events() -> void:
+	# Màn 5, event#10: op 14 (bit 0x80) thả tu sĩ (4,12) đi lên 8 và (4,11) đi lên 7, 400 ms/ô.
+	# Tới ô nào thì chạy sự kiện cờ 64 ở ô đó với tu sĩ đó: (4,4) phải 1, (5,4) xuống 9, (5,13) trái 1,
+	# (4,13) xuống 1, (4,14) teleport sang màn 0 = biến mất.
+	var s := GridState.new(LevelData.load_level(5), Vector2i(0, 0))
+	s.vm.run(s.events[10])
+	eq(s.guards.size(), 2, "hai tu sĩ")
+	eq(s.guard_tile(0), Vector2i(4, 12), "tu sĩ 0 ở chỗ thả")
+	_tick_guards(s, 1600)
+	eq(s.guard_tile(0), Vector2i(4, 8), "4 ô sau 1600 ms")
+	_tick_guards(s, 1600)
+	eq(s.guard_tile(0), Vector2i(4, 4), "tới đích")
+	eq(s.guards[0].to, Vector2i(5, 4), "sự kiện by_actor ở (4,4) cho đi phải")
+	_tick_guards(s, 400)
+	eq(s.guards[0].to, Vector2i(5, 13), "(5,4): xuống 9")
+	_tick_guards(s, 4400)
+	eq(s.guards[0], null, "đi hết đường thì teleport khỏi màn")
+	eq(s.guards[1], null, "tu sĩ 1 cũng vậy")
+	eq(s.player, Vector2i(0, 0), "sự kiện của tu sĩ không đụng tới người chơi")
+
+func test_guard_catches_player_unless_cloaked() -> void:
+	# method_231: tu sĩ thấy người chơi (method_153, 4 nửa ô = 2 ô, không bị vật chắn sáng che) -> năng lượng 0, câu 169.
+	var s := GridState.new(LevelData.load_level(5), Vector2i(4, 8))
+	s.vm.run(s.events[10])
+	s.tick_guards(100)
+	eq(s.energy, s.max_energy, "cách 4 ô: không thấy")
+	s.player = Vector2i(4, 10)
+	s.world.equipped = 20
+	s.tick_guards(100)
+	eq(s.energy, s.max_energy, "mặc áo choàng tu sĩ: không bị bắt")
+	s.world.equipped = -1
+	s.tick_guards(100)
+	eq(s.energy, 0, "cách 2 ô: bị bắt")
+	eq(s.out.filter(func(o): return o.type == "say").map(func(o): return o.text_id), [169], "câu bị bắt")
+	eq(s.out.filter(func(o): return o.type == "death").size(), 1, "chết")
+
 class _CountingVM extends ScriptVM:
 	var runs := 0
-	func run(e: Dictionary) -> bool:
+	func run(e: Dictionary, actor: int = -1) -> bool:
 		runs += 1
-		return super(e)
+		return super(e, actor)
