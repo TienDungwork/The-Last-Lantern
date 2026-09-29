@@ -92,6 +92,13 @@ func _process(delta: float) -> void:
 		state.out.clear()
 		_handle(out)
 
+func _unhandled_input(ev: InputEvent) -> void:
+	# DialogBox (sâu hơn trong cây) nhận phím trước và đánh dấu handled khi đang mở.
+	if ev.is_action_pressed("interact") and not dialog.visible and _pending_level.is_empty() and not _reload_after_dialog:
+		var out := state.action().duplicate()
+		state.out.clear()
+		_handle(out)
+
 func _handle(out: Array) -> void:
 	for o in out:
 		match o.type:
@@ -131,4 +138,4 @@ func _next_say() -> void:
 			load_level(p.level, p.to)
 		return
 	var o: Dictionary = _say_queue.pop_front()
-	dialog.show_line(o.text_id, o.portrait, lang)
+	dialog.show_line(o.text_id, o.portrait, lang, o.get("args", []))

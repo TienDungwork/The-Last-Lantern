@@ -26,7 +26,8 @@ $cmds = @('w1500', 'k-6', 'w3000', 'k-6', 'w1500', 'k-5', 'w4000')
 for ($i = 0; $i -lt $route.intro_dismiss; $i++) { $cmds += 'k-5', 'w700' }
 $cmds += "R$trace"
 for ($i = 0; $i -lt $route.steps.Count; $i++) {
-    $cmds += "h$($keys[[int]$route.steps[$i]]):250", 'w600'
+    if ([int]$route.steps[$i] -eq 5) { $cmds += 'k-5', 'w600' }   # 5 = phím bắn (nhặt/đặt đèn)
+    else { $cmds += "h$($keys[[int]$route.steps[$i]]):250", 'w600' }
     $n = $route.dismiss_after."$i"
     for ($j = 0; $j -lt $n; $j++) { $cmds += 'k-5', 'w700' }
     $cmds += "R$trace", ('s{0:d2}' -f $i)

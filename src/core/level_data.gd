@@ -15,6 +15,7 @@ var events: Array = []    # Dictionary {id, x, y, w, h, flags, commands: [{op, a
 
 static var _tiles: Dictionary = {}
 static var _strings: Dictionary = {}   # lang -> Array[String]
+static var _items: Dictionary = {}
 
 static func read_json(path: String) -> Variant:
 	var f := FileAccess.open(path, FileAccess.READ)
@@ -45,6 +46,12 @@ static func tile_props(tile: int) -> Dictionary:
 	if _tiles.is_empty():
 		_tiles = read_json("res://data/tiles.json")
 	return _tiles.get(str(tile), {"solid": 0, "blocks_light": 0, "dim_light": 0, "movable": 0})
+
+static func item(id: int) -> Dictionary:
+	## {name_id, frame} của món đồ (field_269/270).
+	if _items.is_empty():
+		_items = read_json("res://data/items.json")
+	return _items[str(id)]
 
 static func text(id: int, lang: String = "vi") -> String:
 	if not _strings.has(lang):

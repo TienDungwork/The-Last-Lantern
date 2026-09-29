@@ -20,17 +20,21 @@ func _replay(name: String) -> GridState:
 	var s := GridState.new(LevelData.load_level(int(route.level)), Vector2i(int(route.spawn[0]), int(route.spawn[1])))
 	eq(s.max_energy, int(trace[0][F.max_energy]), "năng lượng tối đa mặc định")
 	eq(s.energy, int(trace[0][F.energy]), "năng lượng đầu màn")
-	# Sự kiện on-enter bản gốc đã chạy trước dòng trace đầu; chúng không đổi vị trí/sáng ở các tuyến này.
+	eq(_says(s.enter()), int(route.intro_dismiss), "số thoại lúc vào màn")
 	var rules := RulesClassic.new(s, 0)
 	_compare(trace[0], F, rules.light, s, "đầu màn")
 	for i in route.steps.size():
-		s.step(int(route.steps[i]))
+		var out: Array = s.action() if int(route.steps[i]) == 5 else s.step(int(route.steps[i]))   # 5 = phím bắn
+		eq(_says(out), int(route.dismiss_after.get(str(i), 0)), "bước %d số thoại" % i)
 		rules.refresh_light()
 		var t: Dictionary = trace[i + 1]
 		eq(s.player, Vector2i(int(t[F.x]), int(t[F.y])), "bước %d vị trí" % i)
 		eq(s.facing, int(t[F.facing]), "bước %d hướng mặt" % i)
 		_compare(t, F, rules.light, s, "bước %d" % i)
 	return s
+
+func _says(out: Array) -> int:
+	return out.filter(func(o): return o.type == "say").size()
 
 func test_level00_route_matches_original() -> void:
 	var s := _replay("level00")
@@ -41,13 +45,19 @@ func test_level00_box_push_pull_plate() -> void:
 	# Đẩy hộp lên bàn đạp (cửa mở), đi ra, quay lại kéo hộp khỏi bàn đạp (cửa đóng).
 	_replay("level00_box")
 
+func test_level00_flashlight_carry_turn_drop() -> void:
+	_replay("level00_flashlight")
+
+func test_level06_candle_burns_down() -> void:
+	_replay("level06_candle")
+
 func _compare(t: Dictionary, F: Dictionary, light: Array, s: GridState, tag: String) -> void:
 	## Bản gốc ghi độ sáng vào chính ô sàn (giá trị < 8) của lưới [y][x]; ô vật thể giữ mã ô (>= 8).
 	var g: Array = t[F.grid]
 	var bad := []
 	for y in s.level.height:
 		for x in s.level.width:
-			var orig := int(g[y][x])
+			var orig := int(g[y][x]) & 0xFF   # Java byte có dấu
 			if (orig >= 8) != (s.tiles[y][x] >= 8):
 				bad.append("(%d,%d) ô gốc %d, mình %d" % [x, y, orig, s.tiles[y][x]])
 			elif s.tiles[y][x] < 8 and orig != light[y][x]:

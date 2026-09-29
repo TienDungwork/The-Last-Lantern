@@ -137,6 +137,63 @@ func test_box_blocks_light() -> void:
 	s.light = []
 	ok(s.light_map() != before, "bỏ hộp thì bản đồ sáng đổi")
 
+func _light_at(s: GridState, p: Vector2i) -> int:
+	for i in s.lights.size():
+		if Vector2i(int(s.lights[i].x), int(s.lights[i].y)) == p:
+			return i
+	return -1
+
+func test_carry_lantern() -> void:
+	# Đèn lồng tắt ở (8,13) màn 0: nhặt thì bật, đi thì đèn theo, đặt xuống thì ở lại.
+	var s := GridState.new(LevelData.load_level(0), Vector2i(8, 13))
+	var i := _light_at(s, Vector2i(8, 13))
+	s.action()
+	eq(s.carried, i, "đang cầm")
+	eq(int(s.lights[i].on), 1, "nhặt lên thì bật")
+	s.step(3)
+	eq(Vector2i(int(s.lights[i].x), int(s.lights[i].y)), Vector2i(7, 13), "đèn đi theo")
+	ok(s.light_map()[13][6] > 0, "ô trước mặt sáng")
+	s.action()
+	s.step(1)
+	eq(Vector2i(int(s.lights[i].x), int(s.lights[i].y)), Vector2i(7, 13), "đặt xuống thì ở lại")
+
+func test_nothing_to_pick_up() -> void:
+	var s := GridState.new(LevelData.load_level(0), Vector2i(7, 13))
+	s.action()
+	eq(s.carried, -1, "ô trống: tay không")
+
+func test_flashlight_turns_without_stepping() -> void:
+	var s := GridState.new(LevelData.load_level(0), Vector2i(16, 2))
+	var i := _light_at(s, Vector2i(16, 2))
+	s.action()
+	s.step(3)
+	eq(s.player, Vector2i(16, 2), "đổi hướng: đứng yên")
+	eq(int(s.lights[i].dir), 3, "đèn pin quay trái")
+	s.step(3)
+	eq(s.player, Vector2i(15, 2), "cùng hướng: bước")
+
+func test_candle_burns_down() -> void:
+	# Nến (2,2) màn 6 bán kính 5: life 11, mỗi bước -1, bán kính = life >> 1.
+	var s := GridState.new(LevelData.load_level(6), Vector2i(2, 2))
+	var i := _light_at(s, Vector2i(2, 2))
+	s.action()
+	s.step(1)
+	eq(int(s.lights[i].radius), 5, "bước 1: life 10")
+	s.step(1)
+	eq(int(s.lights[i].radius), 4, "bước 2: life 9")
+
+func test_timer_fires_after_its_ms() -> void:
+	# event#42 màn 0: hẹn giờ 1200 ms (0,0,4,176), tắt sẵn, bật bằng op 20.
+	var s := GridState.new(LevelData.load_level(0))
+	s.tick_timers(5000)
+	eq(s.out.size(), 0, "đang tắt: không đếm")
+	s.event_active[42] = true
+	s.tick_timers(1199)
+	eq(s.out.size(), 0, "chưa tới giờ")
+	s.tick_timers(1)
+	eq(s.out.filter(func(o): return o.type == "say").map(func(o): return o.text_id), [8, 9], "tới giờ: chạy")
+	eq(s.event_active[42], false, "không repeat: tắt")
+
 class _CountingVM extends ScriptVM:
 	var runs := 0
 	func run(e: Dictionary) -> bool:

@@ -29,8 +29,10 @@ func _ready() -> void:
 	box.add_child(_label)
 	hide()
 
-func show_line(text_id: int, portrait: int, lang: String) -> void:
+func show_line(text_id: int, portrait: int, lang: String, args: Array = []) -> void:
 	_label.text = LevelData.text(text_id, lang)
+	for i in args.size():   # "%1" trong chuỗi gốc = tên (id chuỗi) truyền kèm
+		_label.text = _label.text.replace("%%%d" % (i + 1), LevelData.text(int(args[i]), lang))
 	_portrait.visible = portrait >= 0
 	if portrait >= 0:
 		_portrait.texture = Portraits.texture(portrait)

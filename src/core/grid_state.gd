@@ -11,7 +11,7 @@ const F_ACTIVE := 2
 const F_BY_ACTOR := 64
 const F_ON_ENTER := 128
 const MOVE_FLAG := {1: 32, 2: 4, 3: 8, 4: 16}   # field_425[dir-1]
-# Sự kiện có lệnh đầu là 16 (bàn đạp), 24 (hẹn giờ), 28 (đếm hộp) không kích hoạt bằng cách đi vào (method_216).
+# Sự kiện có lệnh đầu là 16 (bàn đạp), 24 (hẹn giờ), 28 (cảm biến sáng) không kích hoạt bằng cách đi vào (method_216).
 const SELF_DRIVEN_TYPES := [16, 24, 28]
 const OUT_OF_BOUNDS_TILE := 8 + 48   # 0x38, tường
 
@@ -23,6 +23,7 @@ var events: Array = []           # bản sao sâu của level.events (COUNTER s�
 var event_active: Array = []     # bool theo event id
 var plate_saved: Dictionary = {} # event id bàn đạp đang mở -> ô cửa gốc
 var boxes: Dictionary = {}       # Vector2i -> ô hộp; tách khỏi lưới lúc nạp (field_204..206)
+var carried := -1                # chỉ số đèn đang cầm (field_149), -1 = tay không
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2
@@ -51,7 +52,9 @@ func _init(L: LevelData, spawn: Vector2i = Vector2i(-1, -1), w: World = null) ->
 				boxes[Vector2i(x, y)] = t
 				tiles[y][x] = 0
 	for l in L.lights:
-		lights.append(l.duplicate())
+		var d: Dictionary = l.duplicate()
+		d.life = int(l.radius) * 2 + 1   # field_228[6]: nến mất 1 mỗi bước, bán kính = life >> 1
+		lights.append(d)
 	events = L.events.duplicate(true)
 	for e in events:
 		event_active.append(bool(int(e.flags) & F_ACTIVE))
@@ -83,20 +86,30 @@ func light_map() -> Array:
 		light = LightField.compute(self)
 	return light
 
-func is_lit(p: Vector2i) -> bool:
-	## method_133: ô sàn sáng khi độ sáng > 0; ô vật thể lấy theo 8 ô quanh nó.
-	# ponytail: bản gốc (method_132) có ngoại lệ cho vài loại tường (lấy ô chéo/bên cạnh); M2 sau đối chiếu.
+func light_level(p: Vector2i) -> int:
+	## method_132: độ sáng một ô. Ô vật thể: vài loại tường mượn ô bên phải/dưới/chéo, còn lại lấy ô sàn sáng nhất quanh nó.
 	if not in_bounds(p):
-		return false
-	var m := light_map()
-	if tile_at(p) < 8:
-		return m[p.y][p.x] > 0
+		return 0
+	var t := tile_at(p)
+	if t < 8:
+		return light_map()[p.y][p.x]
+	match t - 8:
+		40, 46:
+			return light_level(p + Vector2i(1, 1))
+		41, 42, 47, 48:
+			return light_level(p + Vector2i(1, 0))
+		43, 44, 45, 49, 50, 51:
+			return light_level(p + Vector2i(0, 1))
+	var best := 0
 	for dy in [-1, 0, 1]:
 		for dx in [-1, 0, 1]:
 			var q := p + Vector2i(dx, dy)
-			if in_bounds(q) and tile_at(q) < 8 and m[q.y][q.x] > 0:
-				return true
-	return false
+			if in_bounds(q) and tile_at(q) < 8:
+				best = maxi(best, light_map()[q.y][q.x])
+	return best
+
+func is_lit(p: Vector2i) -> bool:
+	return light_level(p) > 0   # method_133
 
 func events_at(p: Vector2i, moving_dir: int, on_enter_only: bool = false) -> Array:
 	## method_216 cho người chơi. moving_dir 0 = không lọc hướng (đi vào ô, vào màn).
@@ -122,12 +135,21 @@ func enter() -> Array:
 	for e in events_at(player, 0, true):
 		vm.run(e)
 	update_plates()
+	check_light_sensors()
 	return out
 
 func step(dir: int) -> Array:
 	## Một lượt đi. Bị chắn: chạy sự kiện ô đích có lọc hướng. Đi được: chạy sự kiện ô mới, không lọc hướng.
 	out.clear()
 	if not control:
+		return out
+	if carried >= 0 and dir != facing and int(lights[carried].type) == 1:
+		# Cầm đèn pin: đổi hướng chỉ xoay đèn, không bước.
+		facing = dir
+		lights[carried].dir = dir
+		light = []
+		out.append({"type": "bumped", "dir": dir})
+		check_light_sensors()
 		return out
 	facing = dir
 	var d: Vector2i = DIR_VEC[dir]
@@ -152,10 +174,42 @@ func step(dir: int) -> Array:
 	else:
 		player = target
 		out.append({"type": "moved", "to": player, "dir": dir})
+		if carried >= 0:
+			_carry_light(dir)
 		for e in events_at(target, 0):
 			vm.run(e)
 	update_plates()
+	check_light_sensors()
 	return out
+
+func action() -> Array:
+	## method_149/143, phím bắn: đang cầm đèn thì đặt xuống; tay không thì nhặt đèn (loại 0/1/2) ở ô đang đứng và bật nó.
+	out.clear()
+	if carried >= 0:
+		carried = -1
+		return out
+	for i in lights.size():   # bản gốc không dừng ở đèn đầu: cầm đèn cuối cùng khớp
+		var L: Dictionary = lights[i]
+		if int(L.x) == player.x and int(L.y) == player.y and int(L.type) in [0, 1, 2]:
+			carried = i
+			if int(L.on) == 0 and (int(L.type) != 2 or int(L.life) != 0):
+				L.on = 1
+				light = []
+	check_light_sensors()
+	return out
+
+func _carry_light(dir: int) -> void:
+	var L: Dictionary = lights[carried]
+	L.x = player.x
+	L.y = player.y
+	if int(L.dir) != 0:
+		L.dir = dir
+	if int(L.type) == 2 and int(L.life) > 0:
+		L.life = int(L.life) - 1
+		L.radius = int(L.life) >> 1
+		if int(L.radius) == 0:
+			L.on = 0
+	light = []
 
 func update_plates() -> void:
 	## method_215: bàn đạp (sự kiện lệnh đầu 16) mở ô cửa (x,y) khi vùng của nó có vật thể, người chơi
@@ -186,3 +240,32 @@ func update_plates() -> void:
 		elif not pressed and plate_saved.has(id):
 			set_tile(door, plate_saved[id])
 			plate_saved.erase(id)
+
+func check_light_sensors() -> void:
+	## method_214: sự kiện lệnh đầu 28 chạy (rồi tắt hẳn) khi ô (x,y) của nó sáng >= ngưỡng; ngưỡng 0 = khi ô tối hẳn.
+	for e in events:
+		var id := int(e.id)
+		if not event_active[id] or int(e.commands[0].op) != 28:
+			continue
+		var need := int(e.commands[0].args[0])
+		var lvl := light_level(Vector2i(int(e.x), int(e.y)))
+		if (need != 0 or lvl == 0) and need <= lvl:
+			event_active[id] = false
+			vm.run(e)
+
+func tick_timers(ms: int) -> void:
+	## method_213: sự kiện lệnh đầu 24 đếm lùi số ms 32 bit trong 4 byte đối số, về <= 0 thì chạy.
+	for e in events:
+		if not event_active[int(e.id)] or int(e.commands[0].op) != 24:
+			continue
+		var a: Array = e.commands[0].args
+		var left := (int(a[0]) << 24) | (int(a[1]) << 16) | (int(a[2]) << 8) | int(a[3])
+		if left <= 0:
+			continue
+		left = maxi(left - ms, 0)
+		a[0] = (left >> 24) & 0xFF
+		a[1] = (left >> 16) & 0xFF
+		a[2] = (left >> 8) & 0xFF
+		a[3] = left & 0xFF
+		if left == 0:
+			vm.run(e)

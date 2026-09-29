@@ -22,6 +22,8 @@ func refresh_light() -> void:
 	light = s.light_map()
 
 func tick(dt_ms: int) -> void:
+	s.tick_timers(dt_ms)
+	s.check_light_sensors()
 	light = s.light_map()   # GridState xóa bản đồ khi ô/đèn đổi; tính lại khi cần
 	if s.is_lit(s.player):
 		if dark_timer >= 0:

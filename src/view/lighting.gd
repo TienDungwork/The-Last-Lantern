@@ -9,6 +9,7 @@ const LEVEL_COLORS := [
 const DIR_TO_VEC := {1: Vector3(1, 0, 0), 2: Vector3(0, 0, 1), 3: Vector3(-1, 0, 0), 4: Vector3(0, 0, -1)}
 
 var _lights: Array[Light3D] = []
+var _props: Array[MeshInstance3D] = []
 
 func setup_environment() -> void:
 	var env := Environment.new()
@@ -28,6 +29,26 @@ func sync(s: GridState, field: Array, builder: LevelBuilder) -> void:
 	for l in _lights:
 		l.queue_free()
 	_lights.clear()
+	for m in _props:
+		m.queue_free()
+	_props.clear()
+	for i in s.lights.size():
+		var L: Dictionary = s.lights[i]
+		if int(L.type) in [0, 1, 2] and i != s.carried:   # đèn nhặt được nằm dưới đất
+			var mi := MeshInstance3D.new()
+			var m := CylinderMesh.new()
+			m.top_radius = 0.12
+			m.bottom_radius = 0.15
+			m.height = 0.35
+			mi.mesh = m
+			var mat := StandardMaterial3D.new()
+			mat.albedo_color = Color(0.9, 0.7, 0.3)
+			mat.emission_enabled = int(L.on) == 1
+			mat.emission = Color(1.0, 0.8, 0.4)
+			mi.material_override = mat
+			mi.position = LevelBuilder.world_pos(Vector2i(int(L.x), int(L.y)), 0.18)
+			add_child(mi)
+			_props.append(mi)
 	for L in s.lights:
 		if int(L.on) == 0 or int(L.radius) <= 0:
 			continue

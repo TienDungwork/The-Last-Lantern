@@ -5,7 +5,7 @@ extends RefCounted
 ## Sự kiện chạy hết -> tắt nếu không có cờ repeat. Bị hủy giữa chừng (IF_HOLDING sai, COUNTER chưa tới,
 ## PICKUP trong tối) -> vẫn bật, lần sau chạy lại được.
 
-const TODO_OPS := [1, 12, 13, 14, 24, 25, 28]
+const TODO_OPS := [1, 12, 13, 14]
 const PERSIST := 0x80
 const MARKER_GROUP_FRAME := 380   # op 4: bật một điểm nhóm 380 thì tắt các điểm 380 khác
 
@@ -85,6 +85,8 @@ func _exec(e: Dictionary, op: int, a: Array) -> bool:
 			if e.has("id"):
 				st.event_active[int(e.id)] = false
 			if int(a[0]) != 255:
+				var it := LevelData.item(int(a[0]))
+				st.out.append({"type": "say", "text_id": 238, "portrait": int(it.frame), "args": [int(it.name_id)]})
 				st.inventory.append(int(a[0]))
 				st.out.append({"type": "pickup", "item": int(a[0])})
 		11:
@@ -94,8 +96,8 @@ func _exec(e: Dictionary, op: int, a: Array) -> bool:
 		15:
 			st.world.map_revealed.append(Vector2i(int(a[0]), int(a[1])))
 			st.out.append({"type": "map_reveal", "at": Vector2i(int(a[0]), int(a[1]))})
-		16:
-			pass   # bàn đạp: GridState.update_plates() xử lý, lệnh tự nó không làm gì
+		16, 24, 28:
+			pass   # bàn đạp / hẹn giờ / cảm biến sáng: GridState kích hoạt, lệnh đầu tự nó không làm gì
 		17:
 			var id := int(a[0])
 			if _level_arg(int(a[1]), World.SET_LIGHT, id, 0, 0, int(a[2])):
@@ -124,6 +126,9 @@ func _exec(e: Dictionary, op: int, a: Array) -> bool:
 			run(st.events[int(a[0])])
 		23:
 			st.out.append({"type": "bulb_socket", "light": int(a[0]) & 0x7F})
+		25:   # method_209 case 25: hồi đầy năng lượng kèm câu 234
+			st.out.append({"type": "say", "text_id": 234, "portrait": -1})
+			st.energy = st.max_energy
 		26, 29:
 			pass   # kiểu trang trí, view đọc trực tiếp từ events khi dựng cảnh
 		27:

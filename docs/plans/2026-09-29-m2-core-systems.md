@@ -13,6 +13,13 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
 | Chuyển màn | TELEPORT (op 6) với màn khác. Rời màn 14 → autosave (`method_112`) |
 | Thế giới (`method_205/206`) | Mỗi lần vào màn nạp lại .dat + áp sổ thay đổi. Chỉ lệnh có bit 0x80 ở byte màn mới được ghi. Loại: 0 bật, 1 tắt (triệt nhau), 2 đặt ô (ghi đè cùng x,y), 3 bán kính đèn |
 | COUNTER (op 18) | Tự giảm arg; chạy tiếp khi arg = 1 |
+| Hộp | Ô có bit movable tách thành danh sách riêng lúc nạp (ô lưới = 0). Đẩy; phía sau bị chặn thì **kéo** (lùi 1 ô, hộp vào chỗ cũ); hai đầu chặn thì đứng yên. Hộp chặn sáng, đè bàn đạp, chặn cửa bàn đạp |
+| Cầm đèn (method_149/143/92) | Phím bắn nhặt đèn loại 0/1/2 ở ô đang đứng (bật nó), bấm lại để đặt. Đèn pin (1): đổi hướng chỉ xoay. Nến (2): life = r*2+1, mỗi bước -1, r = life>>1 |
+| Op 28 | **Cảm biến sáng** (method_214), không phải đếm hộp: ô (x,y) sáng >= ngưỡng (0 = tối hẳn) thì chạy và tắt hẳn |
+| Op 24 | Hẹn giờ (method_213): 4 byte đối số = ms 32 bit, đếm lùi, về <= 0 thì chạy |
+| Op 25 | Hồi đầy năng lượng + câu 234 |
+| Op 10 | Kèm câu 238 "Bạn tìm thấy: %1" (tên món, chân dung = biểu tượng món) |
+| Cờ 128 | Chạy khi vào màn **và** khi đóng menu trong game (phím 6 -> ield_434), cần làm khi có menu |
 
 ## Phần A — xong
 
@@ -22,11 +29,16 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
 - `game.gd`: dùng `World`, chạy on-enter khi nạp màn, chuyển màn sau khi đóng hết thoại.
 - Test: unit grid_state/script_vm/world, integration change_level.
 
-## Phần B — còn lại (thứ tự làm)
+## Phần B — xong
 
-1. Hộp: đẩy/kéo, op 28 (đếm hộp), bàn đạp bị hộp đè.
-2. Mang đèn/bóng (op 23), nến/đèn pin.
-3. Actor: quái/tu sĩ (op 27), đạn (op 14), hẹn giờ (op 24).
+- Hộp đẩy/kéo; cầm đèn lồng/đèn pin/nến; cảm biến sáng (28); hẹn giờ (24); hồi năng lượng (25); thông báo nhặt đồ.
+- `LightLevel` = port đúng `method_132` (bỏ xấp xỉ cũ ở is_lit).
+- Parity: `level00_box`, `level00_flashlight`, `level06_candle` (so cả số câu thoại mỗi bước với số lần phải đóng thoại ở bản gốc).
+
+## Phần C — còn lại (thứ tự làm)
+
+1. Bóng đèn/đui (op 23), công tắc tường (ô 63/52 -> đèn loại 5).
+2. Actor: quái/tu sĩ (op 27), đạn (op 14).
 4. Nhạc (op 1, MIDI→OGG), kết chương (op 13), minigame (op 12), special (op 30).
 5. Bản đồ thành phố, menu, lưu game (autosave rời màn 14).
 6. Parity route cho mỗi màn (`tools/record_parity.ps1`), kèm một route qua bàn đạp.
