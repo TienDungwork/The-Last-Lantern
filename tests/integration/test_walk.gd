@@ -4,6 +4,7 @@ extends "res://tests/lib/test_case.gd"
 func test_hold_key_walks_continuously() -> void:
 	# Giữ "xuống" 1 giây từ (6,4) màn 0: đi được nhiều ô, thả phím thì dừng.
 	var game: Node = load("res://src/game.tscn").instantiate()
+	game.show_title = false
 	tree.root.add_child(game)
 	await tree.process_frame
 	while game.dialog.visible:   # thoại mở đầu màn 0 (sự kiện on-enter)

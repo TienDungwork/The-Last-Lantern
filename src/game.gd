@@ -12,7 +12,7 @@ const SAVE_PATH := "user://save.json"
 const PIXEL_SCALE := 2   # kiểu B: 1 pixel cảnh = 2x2 pixel cửa sổ (1280x720 -> cảnh 640x360)
 
 @export var start_level := 0
-@export var lang := "vi"
+@export var show_title := true   # test / snap tắt để vào thẳng màn
 
 var world := World.new()
 var state: GridState
@@ -23,6 +23,7 @@ var lighting: LightingView
 var rig: CameraRig
 var dialog: DialogBox
 var hud: Hud
+var menu: Menu
 var _say_queue: Array = []
 var _reload_after_dialog := false
 var _pending_level := {}       # change_level chờ đóng hết thoại rồi mới chuyển
@@ -56,7 +57,40 @@ func _ready() -> void:
 	dialog = DialogBox.new()
 	ui.add_child(dialog)
 	dialog.closed.connect(_next_say)
-	load_level(start_level)
+	menu = Menu.new()
+	ui.add_child(menu)
+	menu.new_game.connect(_new_game)
+	menu.continue_game.connect(_continue_game)
+	menu.quit_to_title.connect(_to_title)
+	menu.visibility_changed.connect(_on_menu_visibility)
+	if show_title:
+		_to_title()
+	else:
+		load_level(start_level)
+
+## Màn tiêu đề: màn 0 làm nền phía sau (không chạy thoại mở đầu), menu phủ lên.
+func _to_title() -> void:
+	world = World.new()
+	load_level(0)
+	_say_queue.clear()
+	dialog.hide()
+	hud.hide()
+	menu.has_save = FileAccess.file_exists(SAVE_PATH)
+	menu.open_title()
+
+func _new_game() -> void:
+	hud.show()
+	world = World.new()
+	load_level(0)
+
+func _continue_game() -> void:
+	hud.show()
+	if not continue_from_save():
+		_new_game()
+
+func _on_menu_visibility() -> void:
+	if not menu.visible and state != null:
+		_refresh_light()
 
 ## Kiểu B: vẽ cảnh 3D ở 1/PIXEL_SCALE độ phân giải rồi phóng nguyên lần bằng nearest, pixel sắc và đều.
 ## UI vẫn vẽ ở độ phân giải đầy đủ. Trả về node chứa cảnh 3D.
@@ -118,7 +152,7 @@ func _refresh_light() -> void:
 	hud.show_state(state, rules.light[state.player.y][state.player.x])
 
 func _process(delta: float) -> void:
-	if _reload_after_dialog or dialog.visible or not _pending_level.is_empty():
+	if menu.visible or _reload_after_dialog or dialog.visible or not _pending_level.is_empty():
 		return
 	# Giữ phím là đi liên tục, mỗi ô đúng một nhịp ActorView.STEP_TIME (kể cả khi đâm tường,
 	# để sự kiện "repeat" không chạy mỗi khung hình).
@@ -234,15 +268,17 @@ func _set_pointer(slot: int, p) -> void:
 
 func _unhandled_input(ev: InputEvent) -> void:
 	# DialogBox (sâu hơn trong cây) nhận phím trước và đánh dấu handled khi đang mở.
-	if dialog.visible or not _pending_level.is_empty() or _reload_after_dialog:
+	if menu.visible or dialog.visible or not _pending_level.is_empty() or _reload_after_dialog:
 		return
+	menu.world = world
 	if ev.is_action_pressed("interact"):
 		var out := state.action().duplicate()
 		state.out.clear()
 		_handle(out)
+	elif ev.is_action_pressed("menu"):
+		menu.open_pause()
 	elif ev.is_action_pressed("inventory"):
-		world.cycle_equipped()
-		_refresh_light()
+		menu.open_inventory(menu._close)
 
 func _handle(out: Array) -> void:
 	for o in out:
@@ -288,4 +324,4 @@ func _next_say() -> void:
 			load_level(p.level, p.to)
 		return
 	var o: Dictionary = _say_queue.pop_front()
-	dialog.show_line(o.text_id, o.portrait, lang, o.get("args", []))
+	dialog.show_line(o.text_id, o.portrait, menu.lang, o.get("args", []))

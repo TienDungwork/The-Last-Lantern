@@ -63,16 +63,6 @@ func test_save_load_roundtrip() -> void:
 	eq(w2.enter_level(3).tiles[5][3], 0, "sổ thay đổi áp lại được")
 	eq(World.load_game("user://khong_co.json"), {}, "không có file: rỗng")
 
-func test_cycle_equipped() -> void:
-	var w := World.new()
-	w.inventory = [3, 20] as Array[int]
-	w.cycle_equipped()
-	eq(w.equipped, 3, "tay không -> món đầu")
-	w.cycle_equipped()
-	eq(w.equipped, 20, "món sau")
-	w.cycle_equipped()
-	eq(w.equipped, -1, "hết vòng: bỏ trang bị")
-
 func test_taking_equipped_item_unequips() -> void:
 	var w := World.new()
 	var s := w.enter_level(0)

@@ -3,6 +3,7 @@ extends "res://tests/lib/test_case.gd"
 
 func test_pointers_follow_dialog() -> void:
 	var game: Node = load("res://src/game.tscn").instantiate()
+	game.show_title = false
 	tree.root.add_child(game)
 	await tree.process_frame
 	while game.dialog.visible:
@@ -24,6 +25,7 @@ func test_pointers_follow_dialog() -> void:
 
 func test_boss_view_follows_core() -> void:
 	var game: Node = load("res://src/game.tscn").instantiate()
+	game.show_title = false
 	tree.root.add_child(game)
 	await tree.process_frame
 	game.load_level(3, Vector2i(1, 8))

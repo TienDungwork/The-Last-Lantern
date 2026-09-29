@@ -27,6 +27,7 @@ func _initialize() -> void:
 			var p := args[i + 1].split(",")
 			at = Vector2i(int(p[0]), int(p[1]))
 	var game: Node = load("res://src/game.tscn").instantiate()
+	game.show_title = "--title" in args   # --title: chụp màn tiêu đề
 	game.start_level = level
 	root.add_child(game)
 	for i in 10:

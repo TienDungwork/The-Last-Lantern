@@ -16,11 +16,6 @@ var map_revealed: Array = []     # Vector2i (op 15)
 var log: Array = []              # {type, level, id, x, y, value}
 var play_ms := 0                 # field_188, tổng thời gian chơi
 
-func cycle_equipped() -> void:
-	## ponytail: tạm đổi món trang bị bằng một phím (tay không -> từng món -> tay không); màn hình túi đồ làm cùng menu.
-	var opts: Array = [-1] + Array(inventory)
-	equipped = opts[(opts.find(equipped) + 1) % opts.size()]
-
 func save_game(path: String, level: int, at: Vector2i) -> void:
 	## method_112, dạng JSON. Không dùng var_to_str/str_to_var: file do người dùng giữ, chỉ đọc dữ liệu thuần.
 	var d := {"version": 1, "level": level, "x": at.x, "y": at.y, "inventory": inventory, "equipped": equipped,

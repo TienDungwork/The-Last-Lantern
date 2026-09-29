@@ -3,6 +3,7 @@ extends "res://tests/lib/test_case.gd"
 
 func test_teleport_loads_new_level_keeping_world() -> void:
 	var game: Node = load("res://src/game.tscn").instantiate()
+	game.show_title = false
 	tree.root.add_child(game)
 	await tree.process_frame
 	game.world.inventory.append(99)
@@ -24,6 +25,7 @@ func test_teleport_loads_new_level_keeping_world() -> void:
 
 func test_continue_from_save() -> void:
 	var game: Node = load("res://src/game.tscn").instantiate()
+	game.show_title = false
 	tree.root.add_child(game)
 	await tree.process_frame
 	var path := "user://test_continue.json"
