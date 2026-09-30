@@ -305,6 +305,11 @@ test `tests/enhanced/level_NN.gd`. Không sửa `data/`.
 
 ## 6. M5: Đóng gói
 
+> **Đang làm (2026-09-30):** `.\tools\export.ps1` xuất `export\TheLastLantern2-2.5D.exe` (một file, PCK nhúng, 153 MB,
+> chạy thử sạch log). Xong bước 1–3 và 5: preset `export_presets.cfg` (thêm `*.json` vì data đọc bằng FileAccess), icon
+> MIDlet gốc phóng 256 px, fallback OpenGL 3 cho máy không có Vulkan/D3D12. `Portraits` đổi sang `load()` vì bản export
+> không có png gốc. Còn: bước 4 (thử trên máy không có Godot, 1366×768 / 1920×1080), bước 6 (CHANGELOG, hướng dẫn).
+
 1. Godot → Project → Export → Windows Desktop, tải export templates cùng phiên bản.
 2. Bật "Embed PCK", icon từ `df2_desktop\icon.png`, tên `TheLastLantern2-2.5D.exe`.
 3. Tắt console, đặt renderer Forward+ với fallback Mobile cho máy yếu (Project Settings → Rendering → Renderer).

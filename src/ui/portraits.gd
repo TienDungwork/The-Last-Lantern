@@ -20,13 +20,16 @@ static func frame(id: int) -> Dictionary:
 ## Atlas cỡ SCALE (image/img/<png>), không có thì ảnh gốc phóng SCALE lần.
 static func image(png: String) -> Image:
 	if not _images.has(png):
-		var hd := ProjectSettings.globalize_path("res://image/img/" + png)
+		# load() thay vì Image.load_from_file: bản export chỉ có .ctex đã import, không có file png gốc.
+		var hd := "res://image/img/" + png
 		var img: Image
-		if FileAccess.file_exists(hd):
-			img = Image.load_from_file(hd)
+		if ResourceLoader.exists(hd):
+			img = load(hd).get_image()
 		else:
-			img = Image.load_from_file(ProjectSettings.globalize_path("res://assets/original/" + png))
+			img = load("res://assets/original/" + png).get_image()
 			img.resize(img.get_width() * SCALE, img.get_height() * SCALE, Image.INTERPOLATE_NEAREST)
+		if img.is_compressed():
+			img.decompress()
 		img.convert(Image.FORMAT_RGBA8)
 		_images[png] = img
 	return _images[png]
