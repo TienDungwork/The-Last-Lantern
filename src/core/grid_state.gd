@@ -30,6 +30,7 @@ const BOSS2_TILE := 4096             # method_199 tính bằng pixel<<8: 1 ô = 
 const BOSS2_LAMP_DAMAGE := 6400      # 4 đèn là hết máu
 const FIREBALL_SLOTS := 3            # field_403
 const FLASH_MS := 1500               # field_160: flash máy ảnh sáng chừng này ms, trong lúc đó không đi được
+const FIRE_LIGHT := 7                # loại đèn của Bức tường lửa: không đè bàn đạp, không nhặt được
 
 var level: LevelData
 var world: World
@@ -41,6 +42,8 @@ var event_active: Array = []     # bool theo event id
 var plate_saved: Dictionary = {} # event id bàn đạp đang mở -> ô cửa gốc
 var boxes: Dictionary = {}       # Vector2i -> ô hộp; tách khỏi lưới lúc nạp (field_204..206)
 var carried := -1                # chỉ số đèn đang cầm (field_149), -1 = tay không
+var carried_back := -1           # Đèn đôi: đèn đeo lưng, đi theo người chơi và vẫn sáng
+var fire_tiles: Array = []       # Bức tường lửa đang cháy (Skills ghi): tu sĩ không đi vào
 var bulbs := 0                   # bóng đèn đang có (field_278), riêng từng màn
 ## Tu sĩ (op 14 bit 0x80, field_465..472): null = ô trống. pos tính bằng 1/GUARD_TILE_MS ô để đi mượt theo ms.
 ## {pos: Vector2i, to: Vector2i, dir: int}
@@ -254,7 +257,7 @@ func _step(dir: int) -> Array:
 		world.steps += 1   # field_139
 		out.append({"type": "moved", "to": player, "dir": dir})
 		_tick_flicker()
-		if carried >= 0:
+		if carried >= 0 or carried_back >= 0:
 			_carry_light(dir)
 		for e in events_at(target, 0):
 			vm.run(e)
@@ -298,7 +301,7 @@ func action() -> Array:
 		return out
 	for i in lights.size():   # bản gốc không dừng ở đèn đầu: cầm đèn cuối cùng khớp
 		var L: Dictionary = lights[i]
-		if int(L.x) == player.x and int(L.y) == player.y and int(L.type) in [0, 1, 2]:
+		if int(L.x) == player.x and int(L.y) == player.y and int(L.type) in [0, 1, 2] and i != carried_back:
 			carried = i
 			var on := 0 if clara() else 1   # Clara che đèn trong áo, đặt xuống mới sáng
 			if int(L.on) != on and (on == 0 or int(L.type) != 2 or int(L.life) != 0):
@@ -386,6 +389,13 @@ func spawn_guard(at: Vector2i, dir: int, dist: int) -> void:
 func guard_tile(i: int) -> Vector2i:
 	return guards[i].pos / GUARD_TILE_MS
 
+## Ô mà vật đi theo hướng d (pos tính bằng 1/unit ô) sắp bước vào: đang giữa hai ô thì là ô phía trước.
+static func _entering(pos: Vector2i, d: Vector2i, unit: int) -> Vector2i:
+	var t := Vector2i(pos.x / unit, pos.y / unit)
+	if d.x > 0 or d.y > 0:
+		return t + d
+	return Vector2i((pos.x + unit - 1) / unit, (pos.y + unit - 1) / unit) + d
+
 func tick_guards(ms: int) -> void:
 	## method_231: thấy người chơi (không mặc áo choàng) là bị bắt; đi tới đích thì chạy sự kiện cờ 64 ở đó.
 	var seen := false
@@ -403,6 +413,9 @@ func tick_guards(ms: int) -> void:
 		if d.x == 0:
 			d.y = signi(goal.y - g.pos.y)
 		g.dir = {Vector2i(1, 0): 1, Vector2i(0, 1): 2, Vector2i(-1, 0): 3, Vector2i(0, -1): 4}[d]
+		if _entering(g.pos, d, GUARD_TILE_MS) in fire_tiles:
+			g.dir = {1: 3, 2: 4, 3: 1, 4: 2}[g.dir]   # gặp lửa: quay đầu, đứng chờ lửa tắt rồi đi tiếp
+			continue   # ponytail: đứng chờ thay vì đi ngược lộ trình, vì kịch bản chỉ cho tu sĩ một đích
 		var left := absi((goal - g.pos).x + (goal - g.pos).y)
 		if ms < left:
 			g.pos += d * ms
@@ -645,6 +658,12 @@ func _light_index(p: Vector2i, type: int) -> int:
 	return -1
 
 func _carry_light(dir: int) -> void:
+	if carried_back >= 0:
+		lights[carried_back].x = player.x
+		lights[carried_back].y = player.y
+		light = []
+	if carried < 0:
+		return
 	var L: Dictionary = lights[carried]
 	L.x = player.x
 	L.y = player.y
@@ -679,6 +698,8 @@ func update_plates() -> void:
 					pressed = true
 		for i in lights.size():
 			var L: Dictionary = lights[i]
+			if int(L.type) == FIRE_LIGHT:
+				continue
 			if i != flash_light and rect.has_point(Vector2i(int(L.x), int(L.y))):
 				pressed = true   # đèn flash không đè bàn đạp nhưng vẫn chặn cửa (field_234 - 1 / method_142)
 			if int(L.x) == door.x and int(L.y) == door.y:

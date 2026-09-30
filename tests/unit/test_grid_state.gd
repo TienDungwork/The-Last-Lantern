@@ -99,6 +99,21 @@ func test_pressure_plate_opens_and_closes_door() -> void:
 	s.step(4)
 	eq(s.tiles[9][13], 0x52, "rời bàn đạp: cửa đóng")
 
+func test_flash_light_holds_door_but_not_plate() -> void:
+	# method_215: vùng bàn đạp bỏ đèn cuối (flash, field_234 - 1), còn ô cửa xét mọi đèn (method_142).
+	var s := GridState.new(LevelData.load_level(0), Vector2i(14, 7))
+	var F: Dictionary = s.lights[s.flash_light]
+	F.x = 14
+	F.y = 8
+	s.update_plates()
+	eq(s.tiles[9][13], 0x52, "flash nằm trên bàn đạp: cửa vẫn đóng")
+	s.step(2)
+	eq(s.tiles[9][13], 0, "đứng lên bàn đạp: cửa mở")
+	F.x = 13
+	F.y = 9
+	s.step(4)
+	eq(s.tiles[9][13], 0, "flash kẹt ở ô cửa: rời bàn đạp cửa vẫn mở")
+
 func test_box_extracted_from_grid() -> void:
 	var s := GridState.new(LevelData.load_level(0))
 	eq(s.boxes, {Vector2i(16, 8): 67}, "màn 0 có một hộp ở (16,8)")
