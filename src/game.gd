@@ -187,8 +187,9 @@ func _setup_input() -> void:
 			InputMap.action_add_event(action, ev)
 
 func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
+	LevelData.hero = world.hero
 	state = world.enter_level(n, spawn)
-	rules = RulesMain.new(state, randi())
+	rules = (RulesClara if world.hero == "clara" else RulesMain).new(state, randi())
 	if skills == null or skills.s.world != world:
 		skills = Skills.new(state)
 	else:
@@ -232,6 +233,7 @@ func _refresh_light() -> void:
 func _process(delta: float) -> void:
 	if skills:
 		hud.show_skills(skills)
+	hud.show_virus(rules.virus if rules is RulesClara else -1, rules is RulesClara and rules.monster)
 	if _fx_wait > 0.0:
 		_fx_wait -= delta
 		if _fx_wait <= 0.0:
@@ -420,7 +422,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 		menu.open_map(menu._close)
 	elif ev is InputEventKey and ev.pressed and not ev.echo:
 		if ev.physical_keycode >= KEY_1 and ev.physical_keycode <= KEY_4:   # chiêu 1..4; số vẫn tính vào mã thưởng bên dưới
-			var msg := skills.use(ev.physical_keycode - KEY_1)
+			var msg := "Đang hóa quái, không dùng được chiêu" if rules is RulesClara and rules.monster \
+				else skills.use(ev.physical_keycode - KEY_1)
 			if msg != "":
 				hud.toast(msg)
 			_refresh_light()

@@ -15,6 +15,7 @@ const GOLD := Color(1.0, 0.82, 0.35)
 var highlight := -1   # op 27 mode 2: chỉ số nhóm 0 bóng đèn, 1 năng lượng, 2 ô trang bị, 3 túi (field_244..259)
 var _groups: Array[PanelContainer] = []   # theo chỉ số trên
 var _hp: ProgressBar
+var _virus: ProgressBar    # Clara: thanh virus 0..100
 var _bulbs: Label
 var _slot_icon: TextureRect
 var _debug: Label
@@ -140,6 +141,15 @@ func _ready() -> void:
 	_hp.add_theme_stylebox_override("background", bg)
 	_hp.add_theme_stylebox_override("fill", fill)
 	energy.add_child(_hp)
+	_virus = _hp.duplicate()
+	_virus.custom_minimum_size.x = 100
+	_virus.max_value = RulesClara.VIRUS_MAX
+	var vfill := fill.duplicate()
+	vfill.bg_color = Color(0.45, 0.2, 0.7)
+	_virus.add_theme_stylebox_override("fill", vfill)
+	_virus.tooltip_text = "Virus"
+	_virus.hide()
+	energy.add_child(_virus)
 	var bulbs := _groups[0].get_child(0)
 	bulbs.add_child(icon(FRAME_BULB))
 	_bulbs = outlined(Label.new(), 24)
@@ -238,6 +248,12 @@ func _process(_delta: float) -> void:
 func _unhandled_input(ev: InputEvent) -> void:
 	if ev is InputEventKey and ev.pressed and not ev.echo and ev.physical_keycode == KEY_F3:
 		_debug.visible = not _debug.visible
+
+## Thanh virus của Clara; v < 0 = ẩn. Hóa quái: thanh nháy đỏ.
+func show_virus(v: int, monster: bool) -> void:
+	_virus.visible = v >= 0
+	_virus.value = v
+	_virus.modulate = Color(2.0, 0.5, 0.5) if monster and Time.get_ticks_msec() % 400 < 200 else Color.WHITE
 
 func show_state(s: GridState, light_level: int) -> void:
 	_hp.max_value = s.max_energy

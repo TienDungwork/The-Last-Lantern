@@ -63,6 +63,7 @@ var flash_ms := 0                # field_160, ms flash còn lại
 var flash_light := -1            # field_161: đèn phụ cuối danh sách (loại 3, bán kính 6) dùng cho flash
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
+var entry: Vector2i              # ô vào màn: Clara bị tu sĩ bắt thì đưa về đây
 var facing: int = 2
 var control: bool = true
 var out: Array = []
@@ -98,7 +99,12 @@ func _init(L: LevelData, spawn: Vector2i = Vector2i(-1, -1), w: World = null) ->
 	for e in events:
 		event_active.append(bool(int(e.flags) & F_ACTIVE))
 	player = spawn if spawn.x >= 0 else L.start
+	entry = player
 	vm = ScriptVM.new(self)
+
+## Tuyến Clara (spec hero-select-clara mục 6): Mắt đêm, Hòa vào bóng tối, che đèn khi cầm, bị bắt sống, không hồi ở op 3/25.
+func clara() -> bool:
+	return world.hero == "clara"
 
 func in_bounds(p: Vector2i) -> bool:
 	return p.x >= 0 and p.y >= 0 and p.x < level.width and p.y < level.height
@@ -173,8 +179,8 @@ func events_at(p: Vector2i, moving_dir: int, on_enter_only: bool = false, actor:
 		var flags := int(e.flags)
 		if (on_enter_only and not (flags & F_ON_ENTER)) or bool(flags & F_BY_ACTOR) != (actor >= 0):
 			continue
-		if int(e.commands[0].op) == 10 and not is_lit(Vector2i(int(e.x), int(e.y))):
-			continue   # vật phẩm chỉ nhặt được khi ô sáng
+		if int(e.commands[0].op) == 10 and not is_lit(Vector2i(int(e.x), int(e.y))) and not clara():
+			continue   # vật phẩm chỉ nhặt được khi ô sáng (Clara: Mắt đêm)
 		if p.x < int(e.x) or p.y < int(e.y) or p.x >= int(e.x) + int(e.w) or p.y >= int(e.y) + int(e.h):
 			continue
 		if moving_dir > 0 and not (flags & MOVE_FLAG[moving_dir]):
@@ -260,23 +266,42 @@ func action() -> Array:
 	## Cầm máy ảnh đã lắp pin: chụp flash (hết pin thì không làm gì).
 	out.clear()
 	if world.equipped == World.CAMERA and world.flash:
-		if world.battery > 0 and flash_ms == 0:
+		if clara():
+			out.append({"type": "say", "text_id": 304, "portrait": 171})   # 171 = nhân vật chính, dialog đổi sang Clara
+		elif world.battery > 0 and flash_ms == 0:
 			if not world.infinite_battery:
 				world.battery -= 1
 			_set_flash(true)
 		return out
 	if carried >= 0:
-		carried = -1
+		_put_down()
 		return out
 	for i in lights.size():   # bản gốc không dừng ở đèn đầu: cầm đèn cuối cùng khớp
 		var L: Dictionary = lights[i]
 		if int(L.x) == player.x and int(L.y) == player.y and int(L.type) in [0, 1, 2]:
 			carried = i
-			if int(L.on) == 0 and (int(L.type) != 2 or int(L.life) != 0):
-				L.on = 1
+			var on := 0 if clara() else 1   # Clara che đèn trong áo, đặt xuống mới sáng
+			if int(L.on) != on and (on == 0 or int(L.type) != 2 or int(L.life) != 0):
+				L.on = on
 				light = []
 	check_light_sensors()
 	return out
+
+func _put_down() -> void:
+	var L: Dictionary = lights[carried]
+	carried = -1
+	if clara() and (int(L.type) != 2 or int(L.life) != 0):
+		L.on = 1
+		light = []
+
+## Clara bị tu sĩ thấy: đèn đang cầm rơi tại chỗ, về ô vào màn, túi đồ giữ nguyên.
+func _capture() -> void:
+	if carried >= 0:
+		_put_down()
+	forced = {}
+	player = entry
+	out.append({"type": "say", "text_id": 169, "portrait": -1})
+	out.append({"type": "teleported", "to": player})
 
 func _set_flash(on: bool) -> void:
 	## method_88: bật đèn flash ở ô người chơi rồi chạy lại mọi sự kiện ở ô đó (nhặt được đồ trong tối); hết giờ thì tắt.
@@ -348,7 +373,8 @@ func tick_guards(ms: int) -> void:
 		var g = guards[i]
 		if g == null:
 			continue
-		if world.equipped != CLOAK and sees(player * 2, guard_tile(i) * 2, GUARD_SIGHT):
+		if world.equipped != CLOAK and sees(player * 2, guard_tile(i) * 2, GUARD_SIGHT) \
+				and not (clara() and light_level(player) == 0):   # Hòa vào bóng tối
 			seen = true
 		var goal: Vector2i = g.to * GUARD_TILE_MS
 		if g.pos == goal:
@@ -364,7 +390,9 @@ func tick_guards(ms: int) -> void:
 			g.pos = goal
 			for e in events_at(g.to, 0, false, i):
 				vm.run(e, i)
-	if seen and energy > 0:
+	if seen and energy > 0 and clara():
+		_capture()
+	elif seen and energy > 0:
 		energy = 0
 		out.append({"type": "say", "text_id": 169, "portrait": -1})
 		out.append({"type": "death"})

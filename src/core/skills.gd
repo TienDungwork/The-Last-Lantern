@@ -15,18 +15,23 @@ const BANDAGE_MS := 3000
 const BANDAGE_HEAL := [10, 15, 25]
 const BANDAGE_MIN_LIGHT := 3
 const KINDLE_BOOST_MS := 10000
+const SWALLOW_MS := [8000, 12000, 12000]   # Nuốt sáng: cấp 1 kéo dài, cấp 2 xa hơn
+const SWALLOW_REACH := [3, 3, 5]
 const TOO_DARK := "Quá tối, không băng bó được"
 const NO_LAMP := "Không có đèn tắt nào quanh đây"
+const NO_LIGHT := "Không có nguồn sáng nào đủ gần"
 
 var s: GridState:
 	set(v):
 		s = v
 		bandage_ms = 0
 		_boosts.clear()
+		_swallowed.clear()
 var cd := {}                 # tên chiêu -> ms hồi chiêu còn lại
 var bandage_ms := 0          # > 0: đang băng bó, ms còn lại
 var _bandage_at := Vector2i.ZERO
 var _boosts: Array = []      # Mồi lửa cấp 1: [chỉ số đèn, ms còn lại]
+var _swallowed: Array = []   # Nuốt sáng: [chỉ số đèn, ms còn lại], hết giờ bật lại
 
 func _init(state: GridState) -> void:
 	s = state
@@ -58,7 +63,9 @@ func use(slot: int) -> String:
 			return ""   # hồi chiêu tính khi băng xong
 		"kindle":
 			return "" if _kindle() else NO_LAMP
-	return ""   # ponytail: fire_wall, twin_lamp, chiêu của Clara chưa có hiệu ứng
+		"swallow_light":
+			return "" if _swallow() else NO_LIGHT
+	return ""   # ponytail: fire_wall, twin_lamp, call_shadow chưa có hiệu ứng
 
 ## Trả true khi máu hoặc ánh sáng vừa đổi (game.gd vẽ lại).
 func tick(dt_ms: int) -> bool:
@@ -83,7 +90,35 @@ func tick(dt_ms: int) -> bool:
 			s.light = []
 			changed = true
 	_boosts = _boosts.filter(func(b): return b[1] > 0)
+	for w in _swallowed:
+		w[1] -= dt_ms
+		if w[1] <= 0:
+			s.lights[w[0]].on = 1
+			s.light = []
+			s.out.append({"type": "light_changed", "light": w[0]})
+			changed = true
+	_swallowed = _swallowed.filter(func(w): return w[1] > 0)
 	return changed
+
+## Tắt nguồn sáng đang bật gần nhất trong tầm (cả đèn tường), hết giờ bật lại. Không tính đèn flash.
+func _swallow() -> bool:
+	var reach: int = SWALLOW_REACH[s.world.upgrade_level("swallow_light")]
+	var best := -1
+	var best_d := reach + 1
+	for i in s.level.lights.size():
+		var L: Dictionary = s.lights[i]
+		var d := maxi(absi(int(L.x) - s.player.x), absi(int(L.y) - s.player.y))
+		if int(L.on) == 1 and d < best_d:
+			best = i
+			best_d = d
+	if best < 0:
+		return false
+	s.lights[best].on = 0
+	s.light = []
+	s.out.append({"type": "light_changed", "light": best})
+	_swallowed.append([best, SWALLOW_MS[s.world.upgrade_level("swallow_light")]])
+	cd["swallow_light"] = cooldown_max("swallow_light")
+	return true
 
 ## Đèn cầm tay (loại 0..2) đang tắt ở ô đứng hoặc ô kề; nến tàn thì nạp đầy. Đèn cố định không thắp.
 func _kindle() -> bool:

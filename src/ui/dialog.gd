@@ -47,6 +47,7 @@ func _ready() -> void:
 	hide()
 
 func show_line(text_id: int, portrait: int, lang: String, args: Array = []) -> void:
+	portrait = LevelData.portrait(text_id, portrait)
 	_label.text = LevelData.text(text_id, lang)
 	for i in args.size():   # "%1" trong chuỗi gốc: số = id chuỗi (tên món), String = chèn nguyên văn (bảng thống kê)
 		var v = args[i] if args[i] is String else LevelData.text(int(args[i]), lang)

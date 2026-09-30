@@ -3,6 +3,7 @@
 extends SceneTree
 
 func _initialize() -> void:
+	root.unfocusable = true   # không giành focus bàn phím của người đang làm việc
 	var args := OS.get_cmdline_user_args()
 	var level := 0
 	var out := "snap/level.png"
@@ -70,7 +71,12 @@ func _initialize() -> void:
 			mg.press("fire")
 	if "--hero" in args:   # --hero clara
 		game.world.hero = args[args.find("--hero") + 1]
+		game.load_level(level, game.state.player)
+		game._say_queue.clear()
+		game.dialog.hide()
 		game.skills = Skills.new(game.state)
+		for i in 60:   # vài giây trong tối để thấy thanh virus
+			game.rules.tick(50)
 	if "--cd" in args:   # --cd: giả lập đã hạ Boss 1, chiêu 1 đang hồi, chiêu 2 đang băng
 		game.world.bosses_down = 1
 		game.skills.cd["kindle"] = 5200

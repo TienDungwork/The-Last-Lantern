@@ -1,6 +1,10 @@
 # Chọn nhân vật: Daniel hoặc Clara (thiết kế)
 
-Ngày: 2026-09-30. Trạng thái: chờ duyệt. Game chỉ còn một chế độ; chạy trên luật chính `RulesMain`
+Ngày: 2026-09-30. Trạng thái: đang làm. Đã có: menu chọn nhân vật, nâng cấp, chuỗi ghi đè + hoán đổi chân dung,
+`RulesClara` (ngưỡng đau theo mảnh chìa, bỏng, virus + hóa quái khóa chiêu, hồi ở vùng mờ, áo không giới hạn sau Boss 2),
+bắt sống, Hòa vào bóng tối, Mắt đêm, che đèn khi cầm, chặn flash, không hồi ở op 3/25, Nuốt sáng, thanh virus
+(`tests/unit/test_rules_clara.gd`). Còn: sinh vật vây khi hóa quái, Gọi bóng, Bức tường lửa, Đèn đôi, sự kiện riêng
+`data_enhanced/clara/levels/` (6 lời giải riêng, câu loại E), đoạn phim kết thật, Daniel NPC ở màn 13. Game chỉ còn một chế độ; chạy trên luật chính `RulesMain`
 (máu 100, mất theo độ sáng ô — xem ghi chú đổi hướng ở mục M4 của `docs/plans/2026-09-29-master-plan.md`).
 
 ## 1. Mục tiêu

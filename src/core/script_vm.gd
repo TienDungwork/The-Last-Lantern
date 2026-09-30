@@ -51,7 +51,8 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 		2:
 			st.out.append({"type": "say", "text_id": int(a[0]), "portrait": _u16(int(a[1]), int(a[2]))})
 		3:
-			st.energy = st.max_energy
+			if not st.clara():   # Clara chỉ hồi ở vùng mờ
+				st.energy = st.max_energy
 		4:
 			var id := int(a[0])
 			if _marker_frame(id) == MARKER_GROUP_FRAME:
@@ -88,7 +89,7 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 		10:
 			if e.has("x"):   # method_209 case 10: ô sàn của sự kiện đang tối thì hủy
 				var p := Vector2i(int(e.x), int(e.y))
-				if st.tile_at(p) < 8 and st.light_map()[p.y][p.x] < 1:
+				if st.tile_at(p) < 8 and st.light_map()[p.y][p.x] < 1 and not st.clara():
 					return false
 			if e.has("id"):
 				st.event_active[int(e.id)] = false
@@ -164,7 +165,8 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			st.world.add_item(World.BATTERY)
 			st.world.add_item(World.BATTERY)
 			st.out.append({"type": "say", "text_id": 234, "portrait": -1})
-			st.energy = st.max_energy
+			if not st.clara():
+				st.energy = st.max_energy
 		26, 29:
 			pass   # kiểu trang trí, view đọc trực tiếp từ events khi dựng cảnh
 		27:

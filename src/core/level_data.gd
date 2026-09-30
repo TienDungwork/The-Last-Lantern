@@ -17,6 +17,8 @@ static var _tiles: Dictionary = {}
 static var _strings: Dictionary = {}   # lang -> Array[String]
 static var _items: Dictionary = {}
 static var _floor_frames: Array = []
+static var hero := "daniel"            # tuyến đang chơi; "clara" thì text() áp data_enhanced/strings_<lang>_clara.json
+static var _clara: Dictionary = {}     # lang -> {chỉ số: câu | {text, portrait}}
 
 static func read_json(path: String) -> Variant:
 	var f := FileAccess.open(path, FileAccess.READ)
@@ -61,6 +63,25 @@ static func floor_frames() -> Array:
 	return _floor_frames
 
 static func text(id: int, lang: String = "vi") -> String:
+	var o = _override(id, lang)
+	if o != null:
+		return o.text if o is Dictionary else o
 	if not _strings.has(lang):
 		_strings[lang] = read_json("res://data/strings_%s.json" % lang)
 	return _strings[lang][id]
+
+## Chân dung câu thoại: tuyến Clara hoán đổi khung 171 (Daniel) ↔ 179 (Clara), trừ câu ghi đè có kèm "portrait".
+static func portrait(text_id: int, frame: int) -> int:
+	if hero != "clara":
+		return frame
+	var o = _override(text_id, "vi")
+	if o is Dictionary and o.has("portrait"):
+		return int(o.portrait)
+	return {171: 179, 179: 171}.get(frame, frame)
+
+static func _override(id: int, lang: String) -> Variant:
+	if hero != "clara":
+		return null
+	if not _clara.has(lang):
+		_clara[lang] = read_json("res://data_enhanced/strings_%s_clara.json" % lang)
+	return _clara[lang].get(str(id))
