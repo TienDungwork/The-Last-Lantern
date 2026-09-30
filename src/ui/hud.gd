@@ -16,6 +16,7 @@ var highlight := -1   # op 27 mode 2: chỉ số nhóm 0 bóng đèn, 1 năng l�
 var _groups: Array[PanelContainer] = []   # theo chỉ số trên
 var _hp: ProgressBar
 var _virus: ProgressBar    # Clara: thanh virus 0..100
+var _cloak: ProgressBar    # áo choàng: thời gian mặc còn lại, hoặc (mờ) đang chờ mặc lại
 var _bulbs: Label
 var _slot_icon: TextureRect
 var _debug: Label
@@ -150,6 +151,16 @@ func _ready() -> void:
 	_virus.tooltip_text = "Virus"
 	_virus.hide()
 	energy.add_child(_virus)
+	_cloak = _hp.duplicate()
+	_cloak.custom_minimum_size.x = 100
+	_cloak.max_value = 1.0
+	_cloak.step = 0.0
+	var cfill := fill.duplicate()
+	cfill.bg_color = Color(0.55, 0.6, 0.7)
+	_cloak.add_theme_stylebox_override("fill", cfill)
+	_cloak.tooltip_text = "Áo choàng"
+	_cloak.hide()
+	energy.add_child(_cloak)
 	var bulbs := _groups[0].get_child(0)
 	bulbs.add_child(icon(FRAME_BULB))
 	_bulbs = outlined(Label.new(), 24)
@@ -250,6 +261,12 @@ func _unhandled_input(ev: InputEvent) -> void:
 		_debug.visible = not _debug.visible
 
 ## Thanh virus của Clara; v < 0 = ẩn. Hóa quái: thanh nháy đỏ.
+## frac < 0: ẩn. resting: đang chờ mặc lại, frac là phần đã chờ.
+func show_cloak(frac: float, resting: bool) -> void:
+	_cloak.visible = frac >= 0.0
+	_cloak.value = frac
+	_cloak.modulate = Color(1, 1, 1, 0.45) if resting else Color.WHITE
+
 func show_virus(v: int, monster: bool) -> void:
 	_virus.visible = v >= 0
 	_virus.value = v

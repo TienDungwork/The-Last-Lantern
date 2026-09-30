@@ -107,13 +107,15 @@ func sync(s: GridState, field: Array, builder: LevelBuilder) -> void:
 	_props.clear()
 	for i in s.lights.size():
 		var L: Dictionary = s.lights[i]
-		if int(L.type) in [0, 1, 2] and i != s.carried and LevelBuilder.art == "B":
+		if int(L.type) not in [0, 1, 2] or i == s.carried or i == s.carried_back:
+			continue
+		if LevelBuilder.art == "B":
 			var sp := LevelBuilder.frame_sprite(lamp_frame(L))
 			sp.shaded = int(L.on) == 0   # đèn đang cháy tự sáng
 			sp.position = Vector3(int(L.x) - 0.5, LevelBuilder.depth(int(L.y)), int(L.y) - 0.5)
 			add_child(sp)
 			_props.append(sp)
-		elif int(L.type) in [0, 1, 2] and i != s.carried:   # đèn nhặt được nằm dưới đất
+		else:   # đèn nhặt được nằm dưới đất
 			var mi := MeshInstance3D.new()
 			var m := CylinderMesh.new()
 			m.top_radius = 0.12

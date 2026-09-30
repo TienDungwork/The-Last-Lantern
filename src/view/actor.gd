@@ -4,6 +4,8 @@ extends Node3D
 ## Kiểu B: frame gốc nằm phẳng, mỗi hướng một chu kỳ frame, chạy khi đang di chuyển (field_138 / 150 ms).
 
 const STEP_TIME := 0.18
+const BOB := 0.05
+const STILL_GRACE := 0.06   # đứng yên quá chừng này giây mới về hình đứng
 const FACING_Y := {1: -PI / 2, 2: PI, 3: PI / 2, 4: 0.0}   # hướng game -> góc quanh trục Y
 const HALE := [[240, 241, 240, 242], [237, 238, 237, 239], [231, 232, 231, 233], [234, 235, 234, 236]]   # field_144
 const CLOAKED := [[272, 273, 272, 274], [269, 270, 269, 271], [263, 264, 263, 265], [266, 267, 266, 268]]   # field_473, cũng là tu sĩ
@@ -20,7 +22,6 @@ var idle := -1              # >= 0: frame khi đứng yên (boss 1), không thì
 var layers: Array = []      # lớp phụ chồng lên, mỗi lớp một chu kỳ 200 ms (boss 2)
 var glow := false           # tự sáng và chạy frame cả khi đứng yên (cục lửa)
 var dir := 2
-var _tween: Tween
 var _sprite: Sprite3D
 var _ms := 0.0
 var _clock := 0.0
@@ -30,6 +31,10 @@ var _seq_ms := 0.0
 var _lantern: Sprite3D
 var _held: Sprite3D
 var _held_type := -1
+var _target := Vector3.INF  # ô người chơi đang trượt tới (move_to); INF = do game đặt thẳng position
+var _still := 0.0
+var nudge := Vector3.ZERO   # lệch hình tạm (đâm tường), tween về 0
+var hop := 0.0              # nảy lên (nhặt/đặt đồ), tween về 0
 
 func _ready() -> void:
 	if get_child_count() == 0 and LevelBuilder.art == "B":
@@ -57,11 +62,18 @@ func _ready() -> void:
 		add_child(mi)
 
 func _process(delta: float) -> void:
+	if _target != Vector3.INF and position != _target:
+		# Trượt đều 1 ô / STEP_TIME; tụt lại hơn 1 ô (khung hình chậm) thì đi nhanh hơn để đuổi kịp ô logic.
+		position = position.move_toward(_target, delta * LevelBuilder.TILE / STEP_TIME * maxf(1.0, position.distance_to(_target)))
+		if position == _target:
+			set_anim("idle")
 	if _sprite == null:
 		return
 	_clock += delta * 1000.0
 	var moving := glow or (position != _last and _last != Vector3.INF)
 	_last = position
+	_still = 0.0 if moving else _still + delta
+	moving = moving or _still < STILL_GRACE   # vòng hình chân chạy tiếp qua chỗ nối giữa hai ô
 	_ms = _ms + delta * 1000.0 if moving else 0.0
 	var f: int
 	if not _seq.is_empty():
@@ -84,7 +96,8 @@ func _process(delta: float) -> void:
 		var lf: int = cyc[int(_clock / 200.0) % cyc.size()]
 		if l.get_meta("frame") != lf:
 			LevelBuilder.set_frame(l, lf)
-	_sprite.position = Vector3(-0.5, LevelBuilder.depth(position.z) + LevelBuilder.DEPTH_ROW / 2, -0.5)
+	var bob := absf(sin(_ms / frame_ms * PI)) * BOB if moving and not glow else 0.0   # nhún mỗi bước, nhìn từ trên là nảy về phía trước màn
+	_sprite.position = Vector3(-0.5, LevelBuilder.depth(position.z) + LevelBuilder.DEPTH_ROW / 2, -0.5 - bob - hop) + nudge
 	if _lantern:
 		_lantern.visible = LANTERN_FRAMES.has(dir) and _seq.is_empty()
 		if _lantern.visible and _lantern.get_meta("frame") != LANTERN_FRAMES[dir]:
@@ -162,18 +175,32 @@ func _build_toon_hale() -> void:
 		LevelBuilder.part(body, boot, Color(0.1, 0.07, 0.05), Vector3(x, 0.06, 0.03))
 
 func snap_to(p: Vector2i) -> void:
-	if _tween:
-		_tween.kill()
 	position = LevelBuilder.world_pos(p)
+	_target = position
 	_last = position
 
 func move_to(p: Vector2i) -> void:
-	if _tween:
-		_tween.kill()
-	_tween = create_tween()
-	_tween.tween_property(self, "position", LevelBuilder.world_pos(p), STEP_TIME)
-	_tween.finished.connect(set_anim.bind("idle"), CONNECT_ONE_SHOT)
+	_target = LevelBuilder.world_pos(p)
 	set_anim("walk")
+
+## Đi vào tường: xô nhẹ về phía đó rồi bật lại.
+func bump(d: int) -> void:
+	var v: Vector3 = LightingView.DIR_TO_VEC.get(d, Vector3.ZERO) * 0.12
+	var tw := create_tween()
+	tw.tween_property(self, "nudge", v, 0.05).set_ease(Tween.EASE_OUT)
+	tw.tween_property(self, "nudge", Vector3.ZERO, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+## Nhặt/đặt đồ, dùng chiêu: nảy lên một nhịp.
+func pop() -> void:
+	hop = 0.14
+	create_tween().tween_property(self, "hop", 0.0, 0.25).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+
+## Bị thương: chớp màu rồi về bình thường.
+func flash(c: Color) -> void:
+	if _sprite == null:
+		return
+	_sprite.modulate = c
+	create_tween().tween_property(_sprite, "modulate", Color.WHITE, 0.35)
 
 func face(d: int) -> void:
 	if d in FACING_Y:

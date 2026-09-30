@@ -15,8 +15,9 @@ const MAP_CELL := 12   # px mỗi ô bản đồ (bản gốc 4)
 const MAP_COLORS := [Color8(0xE7, 0xE6, 0xCF), Color8(0xB7, 0xB8, 0xB7), Color8(0x82, 0x80, 0x59)]   # method_176
 const MAP_LEGEND := [379, 381, 382, 377, 380, 378, 383]   # method_174, cùng thứ tự câu 129..135
 const MAXED := Color(0.45, 0.85, 0.4)     # trang Kỹ năng: đã tối đa
-const WINDOW := Vector2(900, 470)          # cửa sổ Túi đồ / Kỹ năng cố định, vừa 1024x576
+const WINDOW := Vector2(900, 500)          # cửa sổ Túi đồ / Kỹ năng cố định, vừa 1024x576
 const INV_SLOTS := 18                      # 6 x 3 ô
+const DETAIL_W := 298                      # bề rộng chữ trong khung chi tiết
 ## Trang Kỹ năng: tên (khóa trong World.UPGRADES / UNLOCKS) -> [tên hiện, tóm tắt, [mô tả từng cấp]].
 ## Chiêu không có cấp (Bức tường lửa, Đèn đôi, Một trong số họ) chỉ hiện thông tin.
 const UPGRADE_TEXT := {
@@ -50,6 +51,8 @@ var _page: Control
 var _back: Callable = Callable()
 var _combine := -1            # field_287/288: món đang chờ ghép, -1 = không
 var _skill_snap: Array = []   # trang Kỹ năng: [upgrades, max_energy, energy] trước khi cộng thử; rỗng = không có gì chưa lưu
+var _inv_sel := -1            # món đang xem ở Túi đồ (giữ khi mở lại)
+var _skill_sel := ""          # kỹ năng đang xem ở trang Kỹ năng
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -60,14 +63,6 @@ func _ready() -> void:
 	theme = _theme()
 	load_settings()
 	hide()
-
-static func _box(bg: Color, border: Color, width: int = 3) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.border_color = border
-	sb.set_border_width_all(width)
-	sb.set_content_margin_all(12)
-	return sb
 
 func _theme() -> Theme:
 	var t := Theme.new()
@@ -227,157 +222,282 @@ func _row_icon(frame: int, text: String) -> HBoxContainer:
 	return row
 
 func open_inventory(back: Callable) -> void:
-	var box := _panel("TÚI ĐỒ")
-	_tabs(box, false, back)
-	var info := Label.new()
-	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	info.add_theme_font_size_override("font_size", 20)
+	var w := _window(false, back)
 	var grid := GridContainer.new()
 	grid.columns = 6
 	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 8)
-	box.add_child(grid)
-	box.add_child(info)
-	if world.inventory.is_empty():
-		info.text = "Túi trống."
-	for id in world.inventory:
-		var it := LevelData.item(id)
+	w[1].add_child(grid)
+	var focus: Button = null
+	for k in maxi(INV_SLOTS, ceili(world.inventory.size() / 6.0) * 6):
 		var b := Button.new()
-		b.icon = Portraits.texture(int(it.frame))
+		b.custom_minimum_size = Vector2(72, 72)
+		grid.add_child(b)
+		if k >= world.inventory.size():
+			b.disabled = true   # ô trống
+			b.focus_mode = Control.FOCUS_NONE
+			continue
+		var id: int = world.inventory[k]
+		b.icon = Portraits.texture(int(LevelData.item(id).frame))
 		b.expand_icon = true
-		b.custom_minimum_size = Vector2(84, 84)
-		b.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		if id == world.equipped:
-			b.add_theme_stylebox_override("normal", _box(Color(0.25, 0.17, 0.08), Color(1, 0.82, 0.35), 4))
-		var item_name := LevelData.text(int(it.name_id), lang)
-		var hint := "  (đang dùng — Enter để cất)" if id == world.equipped else "  — Enter để dùng"
-		if World.NOTE_TEXT.has(id):
-			hint = "  — Enter để đọc"
-		if _combine >= 0:
-			hint = "  — Enter để ghép với %s" % LevelData.text(int(LevelData.item(_combine).name_id), lang)
-		b.focus_entered.connect(func(): info.text = item_name + hint)
-		b.mouse_entered.connect(b.grab_focus)
-		b.pressed.connect(_toggle_equip.bind(id, back))
+		b.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		if id == world.equipped or id == _combine:
+			for st in ["normal", "hover"]:
+				b.add_theme_stylebox_override(st, Hud.plate_style(Hud.TINT_SELECTED, 12))
 		var n := world.count(id)
 		if n >= 0:
-			var c := Label.new()
+			var c := Hud.outlined(Label.new(), 18)
 			c.text = str(n) + ("/6" if id == 29 else "")
-			c.add_theme_font_size_override("font_size", 18)
-			c.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 4)
+			c.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 6)
 			b.add_child(c)
-		grid.add_child(b)
-	box.add_child(_button("Đóng", back))
-	_show(box.get_parent(), back)
+		b.focus_entered.connect(_inv_detail.bind(w[2], id))
+		b.mouse_entered.connect(b.grab_focus)
+		b.pressed.connect(_toggle_equip.bind(id, back))
+		if focus == null or id == _inv_sel:
+			focus = b
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	w[3].add_child(spacer)
+	w[3].add_child(_foot_button("Đóng", back))
+	_show(w[0], back)
+	if focus:
+		_inv_detail(w[2], world.inventory[focus.get_index()])
+		focus.grab_focus.call_deferred()
+	else:
+		_detail_head(w[2], null, "Túi trống")
 
-## Hai nút chuyển trang dưới tiêu đề túi đồ: Túi đồ | Kỹ năng (N điểm).
-func _tabs(box: VBoxContainer, skills: bool, back: Callable) -> void:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 8)
-	for t in [["Túi đồ", false], ["Kỹ năng (%d điểm)" % world.upgrade_points(), true]]:
+func _inv_detail(detail: VBoxContainer, id: int) -> void:
+	_inv_sel = id
+	var it := LevelData.item(id)
+	_detail_head(detail, Portraits.texture(int(it.frame)), LevelData.text(int(it.name_id), lang))
+	var n := world.count(id)
+	if n >= 0:
+		_detail_line(detail, "Số lượng: %d%s" % [n, "/6" if id == 29 else ""])
+	if id == world.equipped:
+		_detail_line(detail, "Đang cầm trên tay.", MAXED)
+	_grow(detail)
+	var hint := "Enter: cất đi" if id == world.equipped else "Enter: dùng"
+	if World.NOTE_TEXT.has(id):
+		hint = "Enter: đọc"
+	elif _combine >= 0:
+		hint = "Enter: ghép với %s" % LevelData.text(int(LevelData.item(_combine).name_id), lang)
+	elif world.can_combine(id) and id != world.equipped:
+		hint = "Enter: cầm lên để ghép"
+	_detail_line(detail, hint, Hud.GOLD)
+
+## Khung chung Túi đồ / Kỹ năng (mockup 2026-09-30): tab trên cùng, lưới trái, khung chi tiết phải, thanh đáy.
+## Trả [cửa sổ, chỗ đặt lưới, khung chi tiết, thanh đáy].
+func _window(skills: bool, back: Callable) -> Array:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = WINDOW
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	panel.add_child(box)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 8)
+	for t in [["TÚI ĐỒ", false], ["KỸ NĂNG (%d)" % world.upgrade_points(), true]]:
 		var b := Button.new()
 		b.text = t[0]
-		b.custom_minimum_size = Vector2(240, 0)
-		b.mouse_entered.connect(b.grab_focus)
+		b.custom_minimum_size = Vector2(220, 0)
 		if t[1] == skills:
-			b.add_theme_stylebox_override("normal", _box(Color(0.25, 0.17, 0.08), Color(1, 0.82, 0.35), 4))
+			b.focus_mode = Control.FOCUS_NONE
+			for st in ["normal", "hover", "pressed"]:
+				b.add_theme_stylebox_override(st, Hud.plate_style(Hud.TINT_SELECTED, 12))
+			b.add_theme_color_override("font_color", Hud.GOLD)
+			b.add_theme_color_override("font_hover_color", Hud.GOLD)
 		else:
+			b.modulate = Color(0.8, 0.8, 0.8)
 			b.pressed.connect(_discard_then.bind(open_skills.bind(back) if t[1] else open_inventory.bind(back)))
-		row.add_child(b)
-	box.add_child(row)
-	box.move_child(row, 1)
+		tabs.add_child(b)
+	box.add_child(tabs)
+	var body := HBoxContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 16)
+	box.add_child(body)
+	var left := CenterContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(left)
+	var side := PanelContainer.new()
+	side.custom_minimum_size = Vector2(DETAIL_W + 32, 0)
+	side.add_theme_stylebox_override("panel", Hud.plate_style(Color(0.7, 0.66, 0.62), 16))
+	body.add_child(side)
+	var detail := VBoxContainer.new()
+	detail.add_theme_constant_override("separation", 8)
+	side.add_child(detail)
+	var foot := HBoxContainer.new()
+	foot.add_theme_constant_override("separation", 12)
+	box.add_child(foot)
+	return [panel, left, detail, foot]
 
-## Spec mục 6b. Bấm + là mua thử ngay trên world; Lưu thì chốt, rời trang chưa lưu thì trả lại như cũ.
+func _detail_head(detail: VBoxContainer, tex: Texture2D, name: String) -> void:
+	for c in detail.get_children():
+		detail.remove_child(c)
+		c.queue_free()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	if tex:
+		var ic := TextureRect.new()
+		ic.texture = tex
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.custom_minimum_size = Vector2(72, 72)
+		row.add_child(ic)
+	var t := Hud.title(name, 30)
+	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	t.custom_minimum_size.x = DETAIL_W - (84 if tex else 0)   # chữ tự xuống dòng cần bề rộng cố định, không thì cao vọt
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(t)
+	detail.add_child(row)
+
+func _detail_line(detail: VBoxContainer, text: String, color := Color(0.92, 0.88, 0.8)) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = DETAIL_W
+	l.add_theme_font_size_override("font_size", 18)
+	l.add_theme_color_override("font_color", color)
+	detail.add_child(l)
+	return l
+
+func _grow(box: BoxContainer) -> void:
+	var c := Control.new()
+	c.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(c)
+
+func _foot_button(text: String, action: Callable) -> Button:
+	var b := _button(text, action)
+	b.custom_minimum_size = Vector2(150, 0)
+	return b
+
+## Spec mục 6b. Bấm + (hoặc Enter trên ô) là mua thử ngay trên world; Lưu thì chốt, rời trang chưa lưu thì trả lại như cũ.
 func open_skills(back: Callable) -> void:
 	if _skill_snap.is_empty():
 		_skill_snap = [world.upgrades.duplicate(), world.max_energy, world.energy]
-	var box := _panel("TÚI ĐỒ")
-	_tabs(box, true, back)
-	var info := Label.new()
-	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.custom_minimum_size = Vector2(620, 48)
-	info.add_theme_font_size_override("font_size", 18)
-	info.text = "Trỏ vào một dòng để xem mô tả."
-	var rows := VBoxContainer.new()
-	rows.add_theme_constant_override("separation", 4)
-	box.add_child(rows)
-	var table: Dictionary = World.UPGRADES[world.hero]
-	for n in table:
-		var u: Array = table[n]
+	var w := _window(true, back)
+	var names: Array = Hud.SKILL_ICONS[world.hero].filter(func(n): return UPGRADE_TEXT.has(n))
+	if _skill_sel not in names:
+		_skill_sel = names[0]
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 8)
+	w[1].add_child(grid)
+	var focus: Button = null
+	for n in names:
+		var u: Array = World.UPGRADES[world.hero].get(n, [])
 		var lv := world.upgrade_level(n)
-		var saved := int(_skill_snap[0].get(n, 0))
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 12)
-		row.mouse_filter = Control.MOUSE_FILTER_PASS
-		var ic := TextureRect.new()
-		ic.texture = Hud.skill_icon(world.hero, n)
-		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		ic.stretch_mode = TextureRect.STRETCH_SCALE
-		ic.custom_minimum_size = Vector2(40, 40)
-		row.add_child(ic)
-		var name_l := Label.new()
-		name_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		name_l.text = UPGRADE_TEXT[n][0]
-		name_l.custom_minimum_size = Vector2(240, 0)
-		row.add_child(name_l)
-		var lv_l := Label.new()
-		lv_l.text = "%d/%d" % [lv, u[0]]
-		lv_l.custom_minimum_size = Vector2(90, 0)
-		lv_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(lv_l)
-		var cost := Label.new()
-		cost.custom_minimum_size = Vector2(160, 0)
-		cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		cost.add_theme_font_size_override("font_size", 18)
-		row.add_child(cost)
-		if lv >= u[0]:
-			cost.text = "Tối đa"
-			for l in [name_l, lv_l, cost]:
-				l.add_theme_color_override("font_color", MAXED)
-		elif world.bosses_down < u[2]:
-			cost.text = "Sắp mở khóa"
-			row.modulate = DIMMED
-		else:
-			cost.text = "%d điểm" % u[1]
-			if not world.can_buy(n):
-				row.modulate = DIMMED
-		if lv > saved:
-			lv_l.add_theme_color_override("font_color", Color(1, 0.82, 0.35))
-		var plus := Button.new()
-		plus.text = "+"
-		plus.custom_minimum_size = Vector2(56, 0)
-		plus.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		for st in ["normal", "hover", "focus", "pressed", "disabled"]:   # nút nhỏ vừa dòng 40 px
-			var sb := (theme if theme else _theme()).get_stylebox(st, "Button").duplicate() as StyleBoxFlat
-			sb.set_content_margin_all(2)
-			plus.add_theme_stylebox_override(st, sb)
-		plus.disabled = not world.can_buy(n)
-		plus.pressed.connect(func():
-			world.buy(n)
-			open_skills(back))
-		var show_desc := func(): info.text = UPGRADE_TEXT[n][1]
-		plus.focus_entered.connect(show_desc)
-		plus.mouse_entered.connect(show_desc)
-		row.mouse_entered.connect(show_desc)
-		row.add_child(plus)
-		rows.add_child(row)
-	box.add_child(info)
-	var foot := HBoxContainer.new()
-	foot.add_theme_constant_override("separation", 12)
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 4)
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(76, 76)
+		b.icon = Hud.skill_icon(world.hero, n)
+		b.expand_icon = true
+		for st in ["normal", "hover", "pressed", "disabled"]:   # icon đã có khung sắt riêng
+			b.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+		if not _skill_open(n):
+			b.modulate = Color(0.3, 0.3, 0.3)
+		elif not u.is_empty() and lv < u[0] and not world.can_buy(n):
+			b.modulate = Color(0.65, 0.65, 0.65)
+		b.focus_entered.connect(_skill_detail.bind(w[2], n, back))
+		b.mouse_entered.connect(b.grab_focus)
+		b.pressed.connect(_buy_skill.bind(n, back))
+		b.set_meta("skill", n)
+		cell.add_child(b)
+		var pips := HBoxContainer.new()
+		pips.alignment = BoxContainer.ALIGNMENT_CENTER
+		pips.add_theme_constant_override("separation", 8)
+		pips.custom_minimum_size = Vector2(0, 12)
+		for i in (u[0] if not u.is_empty() else 0):
+			pips.add_child(_pip(i < lv, lv >= u[0], i >= int(_skill_snap[0].get(n, 0))))
+		cell.add_child(pips)
+		grid.add_child(cell)
+		if n == _skill_sel:
+			focus = b
+	var cur := TextureRect.new()
+	cur.texture = Hud.skill_icon("clara", "bracelet") if world.hero == "clara" else Portraits.texture(int(LevelData.item(21).frame))
+	cur.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cur.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cur.custom_minimum_size = Vector2(40, 40)
+	w[3].add_child(cur)
 	var pts := Label.new()
 	pts.text = "Điểm còn lại: %d" % world.upgrade_points()
 	pts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	foot.add_child(pts)
-	var save := _button("Lưu", func():
+	w[3].add_child(pts)
+	var save := _foot_button("Lưu", func():
 		_skill_snap = []
 		open_skills(back))
 	save.disabled = world.upgrades == _skill_snap[0]
-	for b in [save, _button("Đóng", _discard_then.bind(back))]:
-		b.custom_minimum_size = Vector2(150, 0)
-		foot.add_child(b)
-	box.add_child(foot)
-	_show(box.get_parent(), _discard_then.bind(back))
+	w[3].add_child(save)
+	w[3].add_child(_foot_button("Đóng", _discard_then.bind(back)))
+	_show(w[0], _discard_then.bind(back))
+	_skill_detail(w[2], _skill_sel, back)
+	focus.grab_focus.call_deferred()
+
+func _skill_open(n: String) -> bool:
+	var u: Array = World.UPGRADES[world.hero].get(n, [])
+	return world.unlocked(n) if u.is_empty() else world.bosses_down >= int(u[2])
+
+## Chấm cấp dưới icon: vàng = đã có, sáng hơn = vừa cộng chưa lưu, xanh = đã tối đa, tối = chưa có.
+func _pip(bought: bool, maxed: bool, unsaved: bool) -> Panel:
+	var p := Panel.new()
+	p.custom_minimum_size = Vector2(12, 12)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = (MAXED if maxed else (Color(1, 0.95, 0.7) if unsaved else Hud.GOLD)) if bought else Color(0.1, 0.08, 0.06)
+	sb.border_color = Color(0.55, 0.42, 0.22)
+	sb.set_border_width_all(2)
+	p.add_theme_stylebox_override("panel", sb)
+	return p
+
+func _buy_skill(n: String, back: Callable) -> void:
+	if world.buy(n):
+		open_skills(back)
+
+func _skill_detail(detail: VBoxContainer, n: String, back: Callable) -> void:
+	_skill_sel = n
+	if _page:
+		for b in _page.find_children("*", "Button", true, false):
+			if b.has_meta("skill"):
+				b.add_theme_stylebox_override("normal", Hud.focus_style() if b.get_meta("skill") == n else StyleBoxEmpty.new())
+	var t: Array = UPGRADE_TEXT[n]
+	_detail_head(detail, Hud.skill_icon(world.hero, n), t[0])
+	_detail_line(detail, t[1])
+	var u: Array = World.UPGRADES[world.hero].get(n, [])
+	var lv := world.upgrade_level(n)
+	for i in t[2].size():
+		var col := Hud.GOLD if i < lv else (Color(0.95, 0.9, 0.8) if i == lv else Color(0.55, 0.52, 0.48))
+		_detail_line(detail, "Cấp %d: %s" % [i + 1, t[2][i]], col)
+	_grow(detail)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var status := Label.new()
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(status)
+	detail.add_child(row)
+	if not _skill_open(n):
+		var boss: int = World.UNLOCKS[world.hero].get(n, u[2] if not u.is_empty() else 0)
+		status.text = "Sắp mở khóa (sau Boss %d)" % boss
+		status.modulate = Color(0.7, 0.7, 0.7)
+		return
+	if u.is_empty():
+		status.text = "Đã mở"
+		status.add_theme_color_override("font_color", MAXED)
+		return
+	if lv >= u[0]:
+		status.text = "Tối đa"
+		status.add_theme_color_override("font_color", MAXED)
+		return
+	status.text = "%d điểm" % u[1] if world.can_buy(n) else "Thiếu điểm (cần %d)" % u[1]
+	var plus := Button.new()
+	plus.text = "+"
+	plus.custom_minimum_size = Vector2(56, 56)
+	plus.add_theme_font_size_override("font_size", 34)
+	plus.disabled = not world.can_buy(n)
+	plus.pressed.connect(_buy_skill.bind(n, back))
+	row.add_child(plus)
 
 func _discard_skills() -> void:
 	if _skill_snap.is_empty():
@@ -406,11 +526,8 @@ func _panel(title: String) -> VBoxContainer:
 	box.add_theme_constant_override("separation", 14)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	panel.add_child(box)
-	var head := Label.new()
-	head.text = title
+	var head := Hud.title(title, 38)
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	head.add_theme_font_size_override("font_size", 34)
-	head.add_theme_color_override("font_color", Color(1, 0.82, 0.45))
 	box.add_child(head)
 	return box
 

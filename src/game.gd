@@ -34,6 +34,8 @@ var skills: Skills
 var builder: LevelBuilder
 var actor: ActorView
 var lighting: LightingView
+var fx: FxView
+var _last_energy := -1          # máu khung trước, để hiện chữ nổi khi hồi / mất nhiều một lúc
 var rig: CameraRig
 var dialog: DialogBox
 var hud: Hud
@@ -52,6 +54,7 @@ var _menu_in_game := false    # menu mở từ trong màn (không phải màn ti
 var _pending_level := {}       # change_level chờ đóng hết thoại rồi mới chuyển
 var _held: Array = []        # phím hướng đang giữ, phím nhấn sau cùng ở cuối (được ưu tiên)
 var _step_wait := 0.0        # giây còn lại trước khi được đi ô tiếp theo
+var _tap := ""               # phím hướng bấm nhả nhanh trong lúc đang bước: vẫn đi ô đó khi tới nhịp
 var _guard_views: Dictionary = {}     # slot tu sĩ -> ActorView
 var _creature_views: Dictionary = {}  # slot sinh vật -> ActorView
 var _boss_view: Dictionary = {}       # 0 -> ActorView khi có boss
@@ -78,6 +81,8 @@ func _ready() -> void:
 		fill.light_color = LightingView.WARM
 		fill.light_volumetric_fog_energy = 0.0
 		actor.add_child(fill)
+	fx = FxView.new()
+	world.add_child(fx)
 	world.add_child(_beam_view)
 	world.add_child(_dog_view)
 	rig = CameraRig.new()
@@ -196,6 +201,7 @@ func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 		skills.s = state
 	builder.build(state)
 	actor.snap_to(state.player)
+	_last_energy = -1
 	for views in [_guard_views, _creature_views, _boss_view, _boss2_view, _fireball_views, _pointer_views]:
 		for v in views.values():
 			v.queue_free()
@@ -234,6 +240,14 @@ func _process(delta: float) -> void:
 	if skills:
 		hud.show_skills(skills)
 	hud.show_virus(rules.virus if rules is RulesClara else -1, rules is RulesClara and rules.monster)
+	if rules is RulesMain:
+		var r: RulesMain = rules
+		if r.cloak_rest_ms > 0:
+			hud.show_cloak(1.0 - float(r.cloak_rest_ms) / RulesMain.CLOAK_REST_MS, true)
+		elif world.equipped == GridState.CLOAK or r.cloak_worn_ms > 0:
+			hud.show_cloak(1.0 - float(r.cloak_worn_ms) / RulesMain.CLOAK_WEAR_MS, false)
+		else:
+			hud.show_cloak(-1.0, false)
 	if _fx_wait > 0.0:
 		_fx_wait -= delta
 		if _fx_wait <= 0.0:
@@ -244,28 +258,51 @@ func _process(delta: float) -> void:
 		return
 	# Giữ phím là đi liên tục, mỗi ô đúng một nhịp ActorView.STEP_TIME (kể cả khi đâm tường,
 	# để sự kiện "repeat" không chạy mỗi khung hình).
-	_step_wait = maxf(_step_wait - delta, 0.0)
+	# Giữ phần lẻ (tối đa một khung hình) sang bước sau: nhịp bước khớp đúng tốc độ trượt, không khựng ở mỗi ô.
+	_step_wait = maxf(_step_wait - delta, -delta)
 	for action in DIR_ACTION:
 		if Input.is_action_just_pressed(action):
 			_held.erase(action)
 			_held.append(action)
+			_tap = action
 		elif not Input.is_action_pressed(action):
 			_held.erase(action)
-	if _step_wait == 0.0 and not state.forced.is_empty():
+	if _step_wait <= 0.0 and not state.forced.is_empty():
 		state.forced_step()
-		_step_wait = ActorView.STEP_TIME
-	elif _step_wait == 0.0 and not _held.is_empty():
-		state.step(DIR_ACTION[_held.back()])   # step() xóa out cũ trước khi ghi
-		_step_wait = ActorView.STEP_TIME
+		_step_wait += ActorView.STEP_TIME
+	elif _step_wait <= 0.0 and (not _held.is_empty() or _tap != ""):
+		state.step(DIR_ACTION[_held.back() if not _held.is_empty() else _tap])   # step() xóa out cũ trước khi ghi
+		_step_wait += ActorView.STEP_TIME
+		_tap = ""
 	rules.tick(int(delta * 1000.0))
 	if skills.tick(int(delta * 1000.0)):
 		_refresh_light()
+	_sync_fx()
 	world.play_ms += int(delta * 1000.0)
 	_sync_entities()
 	if not state.out.is_empty():
 		var out := state.out.duplicate()
 		state.out.clear()
 		_handle(out)
+
+## Hiệu ứng theo trạng thái kéo dài: lửa đang cháy, đang băng bó, máu đổi nhiều một lúc (không tính rỉ máu trong tối).
+func _sync_fx() -> void:
+	fx.sync_fire(state.fire_tiles)
+	fx.channel(skills.bandage_ms > 0, actor)
+	var gain := state.energy - _last_energy
+	if _last_energy >= 0 and gain >= 5:
+		fx.float_text(state.player, "+%d" % gain, FxView.HEAL)
+	elif _last_energy >= 0 and gain <= -5:
+		fx.float_text(state.player, "%d" % gain, Color(1.0, 0.35, 0.3))
+		actor.flash(Color(1.0, 0.3, 0.3))
+	_last_energy = state.energy
+
+func _skill_fx(name: String) -> void:
+	actor.pop()
+	match name:
+		"fire_wall": fx.throw(state.player, skills.fx_at)
+		"twin_lamp": fx.swirl(state.player)
+		"swallow_light": fx.implode(skills.fx_at)
 
 ## Tu sĩ và sinh vật đi liên tục theo ms trong core; view chỉ chép vị trí mỗi khung hình.
 func _sync_entities() -> void:
@@ -408,8 +445,15 @@ func _unhandled_input(ev: InputEvent) -> void:
 		return
 	menu.world = world
 	if ev.is_action_pressed("interact"):
+		var had := state.carried
 		var out := state.action().duplicate()
 		state.out.clear()
+		if state.carried != had:
+			actor.pop()
+			if state.carried >= 0:
+				fx.spark(state.player)
+			else:
+				fx.dust(state.player, 10)
 		_handle(out)
 	elif ev.is_action_pressed("menu"):
 		_menu_in_game = true
@@ -422,10 +466,15 @@ func _unhandled_input(ev: InputEvent) -> void:
 		menu.open_map(menu._close)
 	elif ev is InputEventKey and ev.pressed and not ev.echo:
 		if ev.physical_keycode >= KEY_1 and ev.physical_keycode <= KEY_4:   # chiêu 1..4; số vẫn tính vào mã thưởng bên dưới
+			var k: int = ev.physical_keycode - KEY_1
+			var name: String = skills.slots()[k] if k < skills.slots().size() else ""
+			var ready := int(skills.cd.get(name, 0)) == 0 and skills.bandage_ms == 0
 			var msg := "Đang hóa quái, không dùng được chiêu" if rules is RulesClara and rules.monster \
-				else skills.use(ev.physical_keycode - KEY_1)
+				else skills.use(k)
 			if msg != "":
 				hud.toast(msg)
+			elif ready and (int(skills.cd.get(name, 0)) > 0 or skills.bandage_ms > 0):
+				_skill_fx(name)
 			_refresh_light()
 		var d := _digit(ev.physical_keycode)
 		if d >= 0:
@@ -456,14 +505,24 @@ func _handle(out: Array) -> void:
 			"moved":
 				actor.face(o.dir)
 				actor.move_to(o.to)
+				fx.dust(o.to - GridState.DIR_VEC.get(o.dir, Vector2i.ZERO))
 			"bumped":
 				actor.face(o.dir)
+				actor.bump(o.dir)
+			"light_changed":
+				var L: Dictionary = state.lights[o.light]
+				if int(L.type) != GridState.FIRE_LIGHT and not L.has("flicker"):   # lửa có hiệu ứng riêng; đèn chập chờn đổi liên tục
+					if int(L.on) == 1:
+						fx.spark(Vector2i(int(L.x), int(L.y)))
+					else:
+						fx.smoke(Vector2i(int(L.x), int(L.y)))
 			"teleported":
 				actor.snap_to(o.to)
 			"say", "pointer", "cutscene", "cutscene_end", "game_end", "wipe", "pose", "minigame":   # áp đúng lúc giữa các câu thoại (kịch bản dừng ở mỗi câu)
 				_say_queue.append(o)
 			"box_moved":
 				builder.move_box(o.from, o.to)
+				fx.dust(o.from, 12)
 			"tile_changed":
 				builder.rebuild_tile(state, o.at)
 			"change_level":
