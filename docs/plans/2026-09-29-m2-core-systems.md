@@ -78,4 +78,6 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
      máy ảnh + pin -> flash. Ghi chú 0/22..25 chọn là đọc (câu 228..232).
    - Flash máy ảnh (`method_149/88`): đèn phụ loại 3 bán kính 6 ở chỗ đứng 1500 ms, khóa đi, chạy lại mọi sự kiện ở ô
      (nhặt được đồ trong tối). Không màn nào cho pin: chỉ có qua mã 683346 (muffin thứ 18). Mã 7825537 = áo choàng.
-7. Parity route cho mỗi màn (`tools/record_parity.ps1`), kèm một route qua bàn đạp.
+7. Parity route cho mỗi màn (`tools/record_parity.ps1`), kèm một route qua bàn đạp. **Đã làm**: `level00_box` qua bàn
+   đạp; `tools/gen_parity_routes.gd` sinh tuyến đi dạo 30 bước, khớp bản gốc ở 11 màn (00 01 04 06 07 08 09 10 14 15 17).
+   Bỏ các màn chạy theo thời gian thực: 02 (tuyến < 5 bước), 03 boss, 05/11/13/18 tu sĩ, 12 hẹn giờ thả tu sĩ, 16 tự đi.

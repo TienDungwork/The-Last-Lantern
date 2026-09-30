@@ -51,6 +51,15 @@ func test_level00_flashlight_carry_turn_drop() -> void:
 func test_level06_candle_burns_down() -> void:
 	_replay("level06_candle")
 
+## Tuyến đi dạo mỗi màn (tools/gen_parity_routes.gd), bỏ các màn có tu sĩ/boss chạy theo thời gian thực.
+func test_walk_routes_every_level() -> void:
+	for f in DirAccess.get_files_at("res://tests/parity/fixtures"):
+		if f.ends_with("_walk_route.json"):
+			var n := errors.size()
+			_replay(f.trim_suffix("_route.json"))
+			if errors.size() > n:
+				errors.insert(n, "--- " + f)
+
 func _compare(t: Dictionary, F: Dictionary, light: Array, s: GridState, tag: String) -> void:
 	## Bản gốc ghi độ sáng vào chính ô sàn (giá trị < 8) của lưới [y][x]; ô vật thể giữ mã ô (>= 8).
 	var g: Array = t[F.grid]
