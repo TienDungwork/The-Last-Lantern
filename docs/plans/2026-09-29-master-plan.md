@@ -246,6 +246,16 @@ texture vân giấy. Cấu trúc:
 
 ## 5. M4: Chế độ Nâng cao
 
+> **Đổi hướng (2026-09-30): không còn hai chế độ.** Game chỉ có một chế độ, gộp dần các cơ chế Nâng cao vào
+> luật chính `RulesMain`. Luật gốc (`RulesClassic`) chỉ còn trong code để chạy test so sánh với bản gốc, menu không có.
+> - Máu 100 thay 4 nấc năng lượng (1 nấc gốc = 25 máu). Mất theo độ sáng ô: 0 → 10 máu/s, 1–2 → 4 máu/s,
+>   >= 3 không mất. Không hồi dần; hồi đầy ở 12 điểm cố định như bản gốc (op 3: 2 chỗ uống nước, 2 lần hạ boss;
+>   op 25: lần đầu mở cửa sau ở 8 màn). **Đã làm** (`src/core/rules_main.gd`, `tests/unit/test_rules_main.gd`).
+> - Đợt 1 (chỉ đổi luật): cường độ (xong cùng máu), bóng đổ, chập chờn.
+> - Đợt 2 (phải sửa từng màn): nhiên liệu, gương, UV.
+> - Chọn nhân vật Daniel/Clara chạy trên `RulesMain` (`docs/specs/2026-09-30-hero-select-clara.md`).
+> - Mọi chỗ dưới đây nói "chế độ Nâng cao" / "chế độ Cổ điển" trong menu là hết hiệu lực; nội dung cơ chế vẫn dùng.
+
 ### 5.1 Định dạng file bổ sung `data_enhanced/levels/NN.json`
 
 ```json

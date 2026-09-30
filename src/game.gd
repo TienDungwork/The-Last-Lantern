@@ -13,7 +13,16 @@ const SAVE_PATH := "user://save.json"
 const LEVEL_MUSIC := [6, 5, 4, 6, 2, 2, 0, 6, 0, 5, 5, 0, 6, 4, 2, 2, 6, 5, 0, 0, 0, -1]
 const TITLE_MUSIC := 4   # tài nguyên 58
 const NEW_GAME_LEVEL := 16   # class_4 case 14: đoạn mở đầu "Năm năm trước...", tự đi rồi dịch chuyển sang màn 0
-const PIXEL_SCALE := 2   # kiểu B: 1 pixel cảnh = 2x2 pixel cửa sổ (1280x720 -> cảnh 640x360)
+const PIXEL_SCALE := 1   # kiểu B: atlas ×4 đã đủ 64 px/ô, vẽ cảnh ở đúng độ phân giải cửa sổ
+# Frame gốc (class_10): tu sĩ field_473; sinh vật sáng field_487 / tối field_488 / chết field_483;
+# boss 1 đứng 410, đi field_395; boss 2 thân 421 + lớp field_408..411; cục lửa field_412; mũi tên field_451.
+const CREATURE_LIT := [[281, 282], [277, 278], [275, 276], [279, 280]]
+const CREATURE_DARK := [[286, 286, 286, 286, 287, 288], [283, 283, 283, 283, 284, 285], [286, 286, 286, 286, 287, 288], [283, 283, 283, 283, 284, 285]]
+const CREATURE_DYING := [289, 290]
+const BOSS_WALK := [[408, 409], [408, 409], [408, 409], [408, 409]]
+const BOSS2_LAYERS := [[422, 423], [424, 429, 430], [425, 431, 432], [426, 433, 434]]
+const FIREBALL := [[427, 428], [427, 428], [427, 428], [427, 428]]
+const POINTER := [407, 406, 405, 404]
 
 @export var start_level := 0
 @export var show_title := true   # test / snap tắt để vào thẳng màn
@@ -21,6 +30,7 @@ const PIXEL_SCALE := 2   # kiểu B: 1 pixel cảnh = 2x2 pixel cửa sổ (1280
 var world := World.new()
 var state: GridState
 var rules: RulesClassic
+var skills: Skills
 var builder: LevelBuilder
 var actor: ActorView
 var lighting: LightingView
@@ -68,7 +78,6 @@ func _ready() -> void:
 		fill.light_volumetric_fog_energy = 0.0
 		actor.add_child(fill)
 	world.add_child(_beam_view)
-	_dog_view.rotation.x = -PI / 2   # frame gốc vẽ từ trên xuống: nằm phẳng trên sàn
 	world.add_child(_dog_view)
 	rig = CameraRig.new()
 	rig.target = actor
@@ -123,9 +132,10 @@ func play_music(track: int) -> void:
 		music.stream = load("res://assets/music/track_%d.wav" % track)
 		music.play()
 
-func _new_game() -> void:
+func _new_game(hero := "daniel") -> void:
 	hud.show()
 	world = World.new()
+	world.hero = hero
 	load_level(NEW_GAME_LEVEL)
 
 func _continue_game() -> void:
@@ -174,7 +184,11 @@ func _setup_input() -> void:
 
 func load_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> void:
 	state = world.enter_level(n, spawn)
-	rules = RulesClassic.new(state, randi())
+	rules = RulesMain.new(state, randi())
+	if skills == null or skills.s.world != world:
+		skills = Skills.new(state)
+	else:
+		skills.s = state
 	builder.build(state)
 	actor.snap_to(state.player)
 	for views in [_guard_views, _creature_views, _boss_view, _boss2_view, _fireball_views, _pointer_views]:
@@ -206,9 +220,14 @@ func continue_from_save(path: String = SAVE_PATH) -> bool:
 func _refresh_light() -> void:
 	rules.refresh_light()
 	lighting.sync(state, rules.light, builder)
+	builder.sync_events(state)
+	var held: Dictionary = state.lights[state.carried] if state.carried >= 0 else {}
+	actor.dress(world.equipped, int(held.get("type", -1)), int(held.get("on", 0)) == 1)
 	hud.show_state(state, rules.light[state.player.y][state.player.x])
 
 func _process(delta: float) -> void:
+	if skills:
+		hud.show_skills(skills)
 	if _fx_wait > 0.0:
 		_fx_wait -= delta
 		if _fx_wait <= 0.0:
@@ -233,6 +252,8 @@ func _process(delta: float) -> void:
 		state.step(DIR_ACTION[_held.back()])   # step() xóa out cũ trước khi ghi
 		_step_wait = ActorView.STEP_TIME
 	rules.tick(int(delta * 1000.0))
+	if skills.tick(int(delta * 1000.0)):
+		_refresh_light()
 	world.play_ms += int(delta * 1000.0)
 	_sync_entities()
 	if not state.out.is_empty():
@@ -242,19 +263,28 @@ func _process(delta: float) -> void:
 
 ## Tu sĩ và sinh vật đi liên tục theo ms trong core; view chỉ chép vị trí mỗi khung hình.
 func _sync_entities() -> void:
-	_sync_list(state.guards, _guard_views, GridState.GUARD_TILE_MS, _sprite_view.bind("ap_00"))
-	_sync_list(state.creatures, _creature_views, GridState.CREATURE_TILE_MS, _sprite_view.bind("aq_00"))
-	for i in _creature_views:   # đang chết: mờ dần trong 1 s
+	_sync_list(state.guards, _guard_views, GridState.GUARD_TILE_MS, _frame_view.bind(ActorView.CLOAKED, 200))
+	_sync_list(state.creatures, _creature_views, GridState.CREATURE_TILE_MS, _frame_view.bind(CREATURE_LIT, 200))
+	for i in _creature_views:   # method_235: sáng/tối đổi chu kỳ; đang chết: frame chết + mờ dần trong 1 s
 		var c = state.creatures[i]
-		var spr := _creature_views[i].get_child(0) as Sprite3D
-		spr.modulate.a = 1.0 - c.timer / 1000.0 if c.state == GridState.C_DYING else 1.0
+		var v: ActorView = _creature_views[i]
+		var lit := state.is_lit(Vector2i(roundi(v.position.x), roundi(v.position.z)))
+		v.frames = [CREATURE_DYING, CREATURE_DYING, CREATURE_DYING, CREATURE_DYING] if c.state == GridState.C_DYING \
+			else CREATURE_LIT if lit else CREATURE_DARK
+		v.frame_ms = 200 if lit else 300
+		var spr := v.get_child(0) as Sprite3D
+		if spr:
+			spr.modulate.a = 1.0 - c.timer / 1000.0 if c.state == GridState.C_DYING else 1.0
 	var b := state.boss
-	_sync_list([] if b.is_empty() else [b], _boss_view, GridState.BOSS_TILE_MS, _sprite_view.bind("ar_00"))
+	_sync_list([] if b.is_empty() else [b], _boss_view, GridState.BOSS_TILE_MS, _frame_view.bind(BOSS_WALK, 200, 410))
 	if not b.is_empty():   # gục: mờ dần trong 5 s
-		(_boss_view[0].get_child(0) as Sprite3D).modulate.a = 1.0 - b.timer / 5000.0 if b.dying else 1.0
+		# ponytail: bản gốc cho boss rã thành 10 mảnh rơi (field_392); ở đây chỉ mờ dần
+		var spr := _boss_view[0].get_child(0) as Sprite3D
+		if spr:
+			spr.modulate.a = 1.0 - b.timer / 5000.0 if b.dying else 1.0
 	var b2 := state.boss2
-	_sync_list([] if b2.is_empty() else [b2], _boss2_view, GridState.BOSS2_TILE, _sprite_view.bind("as_00"))
-	_sync_list(state.fireballs.map(func(p): return {"pos": p}), _fireball_views, 1, _sprite_view.bind("at_00", true))
+	_sync_list([] if b2.is_empty() else [b2], _boss2_view, GridState.BOSS2_TILE, _frame_view.bind([[421], [421], [421], [421]], 200, 421, false, BOSS2_LAYERS))
+	_sync_list(state.fireballs.map(func(p): return {"pos": p}), _fireball_views, 1, _frame_view.bind(FIREBALL, 200, -1, true))
 	if _beam_view.get_meta("beam", {}) != state.sun_beam:
 		_show_sun_beam(state.sun_beam)
 	if _dog_view.get_meta("dog", {}) != state.dog:
@@ -267,9 +297,12 @@ func _show_dog(d: Dictionary) -> void:
 		c.queue_free()
 	if not d.visible:
 		return
-	_dog_view.position = LevelBuilder.world_pos(d.at, 0.02) - Vector3(0.5, 0, 0.5)
-	for f in ([150, 151, 152] if d.pose == 1 else [148, 145, 146, 147]):
-		_dog_view.add_child(LevelBuilder.frame_sprite(f))
+	_dog_view.position = LevelBuilder.world_pos(d.at, LevelBuilder.depth(d.at.y)) - Vector3(0.5, 0, 0.5)
+	var parts: Array = [150, 151, 152] if d.pose == 1 else [148, 145, 146, 147]
+	for i in parts.size():   # vẽ theo thứ tự: mảnh sau nhích lên trên mảnh trước
+		var spr := LevelBuilder.frame_sprite(parts[i])
+		spr.position.y = 0.0003 * i
+		_dog_view.add_child(spr)
 	if d.pose == 0:
 		var t := Timer.new()
 		t.timeout.connect(_dog_blink.bind(_dog_view.get_child(-1), d.sleep))
@@ -279,7 +312,7 @@ func _show_dog(d: Dictionary) -> void:
 func _dog_blink(head: Sprite3D, sleep: bool) -> void:
 	LevelBuilder.set_frame(head, 149 if head.get_meta("frame") == 147 else 147)
 	var j := Vector2(randi_range(-2, 2), randi_range(-2, 2)) if sleep else Vector2.ZERO
-	head.position = Vector3(j.x, -j.y, 0) / 16.0
+	head.position = Vector3(j.x / 16.0, head.position.y, j.y / 16.0)
 
 ## SPECIAL 0/1/3: tia nắng chéo từ trên ô gốc xuống sàn 3 ô phía dưới (bức tượng), 1 hoặc 2 tia.
 func _show_sun_beam(b: Dictionary) -> void:
@@ -319,13 +352,15 @@ func _sync_list(list: Array, views: Dictionary, unit: int, make: Callable) -> vo
 		view.position = Vector3(e.pos.x, 0, e.pos.y) / float(unit) * LevelBuilder.TILE
 		view.face(e.get("dir", 0))
 
-## Sprite thực thể (tools/crop_sheets.py HEIGHT_BY_SHEET): ap tu sĩ, aq sinh vật, ar boss 1, as boss 2, at lửa.
-## glow: tự sáng, không bị bóng tối che.
-func _sprite_view(sprite: String, glow := false) -> ActorView:
+## Hình thực thể bằng frame gốc: frames[hướng] đổi mỗi ms khi đang đi, idle >= 0 là frame đứng yên.
+## glow: cục lửa, tự sáng (không bị bóng tối che) và cháy liên tục cả khi đứng yên.
+func _frame_view(frames: Array, ms: int, idle := -1, glow := false, layers: Array = []) -> ActorView:
 	var v := ActorView.new()
-	var spr := LevelBuilder.sprite(sprite)
-	spr.shaded = not glow
-	v.add_child(spr)
+	v.frames = frames
+	v.frame_ms = ms
+	v.idle = idle
+	v.layers = layers
+	v.glow = glow
 	return v
 
 ## Op 13: màn đen, tranh minh hoạ ở giữa phía trên; hộp thoại vẫn nằm dưới. frame < 0: gỡ.
@@ -344,21 +379,17 @@ func _set_pointer(slot: int, p) -> void:
 	if _pointer_views.has(slot):
 		_pointer_views[slot].queue_free()
 		_pointer_views.erase(slot)
-	if p != null and p.has("at"):
+	if p != null and p.has("at"):   # method_219: frame field_451 tại góc ô lùi 8 px, nhún 0..10 px ngược hướng chỉ, 1 s/chu kỳ
 		var node := Node3D.new()
-		node.rotation.y = {1: 0.0, 2: -PI / 2, 3: PI, 4: PI / 2}.get(p.dir, 0.0)
-		var spr := Sprite3D.new()
-		spr.texture = load("res://assets/new/aj_01.png")
-		spr.pixel_size = 1.0 / LevelBuilder.TEXELS_PER_TILE
-		spr.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-		spr.rotation.x = -PI / 2
-		spr.position.y = 0.05
+		node.position = LevelBuilder.world_pos(p.at, 0.1) - Vector3(1.0, 0, 1.0)
+		var spr := LevelBuilder.frame_sprite(POINTER[int(p.dir) - 1])
+		spr.shaded = false
 		node.add_child(spr)
-		node.position = LevelBuilder.world_pos(p.at)
 		builder.get_parent().add_child(node)
+		var back: Vector3 = {1: Vector3(-1, 0, 0), 2: Vector3(0, 0, -1), 3: Vector3(1, 0, 0), 4: Vector3(0, 0, 1)}[int(p.dir)] * 10.0 / 16.0
 		var tw := node.create_tween().set_loops()
-		tw.tween_property(spr, "position:x", 0.25, 0.2)
-		tw.tween_property(spr, "position:x", -0.25, 0.2)
+		tw.tween_property(spr, "position", back, 0.5)
+		tw.tween_property(spr, "position", Vector3.ZERO, 0.5)
 		_pointer_views[slot] = node
 	_hud_slots.erase(slot)
 	if p != null and p.has("hud"):
@@ -384,6 +415,11 @@ func _unhandled_input(ev: InputEvent) -> void:
 		_menu_in_game = true
 		menu.open_map(menu._close)
 	elif ev is InputEventKey and ev.pressed and not ev.echo:
+		if ev.physical_keycode >= KEY_1 and ev.physical_keycode <= KEY_4:   # chiêu 1..4; số vẫn tính vào mã thưởng bên dưới
+			var msg := skills.use(ev.physical_keycode - KEY_1)
+			if msg != "":
+				hud.toast(msg)
+			_refresh_light()
 		var d := _digit(ev.physical_keycode)
 		if d >= 0 and not world.type_digit(d).is_empty():
 			_refresh_light()
@@ -444,10 +480,10 @@ func _next_say() -> void:
 				_to_title()
 				return
 	if _say_queue.is_empty():
-		if _reload_after_dialog:
+		if _reload_after_dialog:   # class_4 case 11: chết = nạp lại bản tự lưu gần nhất (method_114)
 			_reload_after_dialog = false
-			world.energy = world.max_energy
-			load_level(state.level.index)
+			if not continue_from_save():
+				_new_game(world.hero)
 		elif not _pending_level.is_empty():
 			var p := _pending_level
 			_pending_level = {}

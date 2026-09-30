@@ -3,7 +3,7 @@ extends Control
 ## Mọi trang menu trên một lớp phủ: tiêu đề, tạm dừng, cài đặt, túi đồ, hỏi lại khi thoát.
 ## Bàn phím: mũi tên + Enter (focus của Godot), Esc = quay lại. Game đứng yên khi menu mở (game.gd kiểm tra visible).
 
-signal new_game
+signal new_game(hero: String)
 signal continue_game
 signal quit_to_title
 
@@ -14,6 +14,32 @@ const MAP_ITEM := 3
 const MAP_CELL := 12   # px mỗi ô bản đồ (bản gốc 4)
 const MAP_COLORS := [Color8(0xE7, 0xE6, 0xCF), Color8(0xB7, 0xB8, 0xB7), Color8(0x82, 0x80, 0x59)]   # method_176
 const MAP_LEGEND := [379, 381, 382, 377, 380, 378, 383]   # method_174, cùng thứ tự câu 129..135
+const MAXED := Color(0.45, 0.85, 0.4)     # trang Kỹ năng: đã tối đa
+const WINDOW := Vector2(900, 470)          # cửa sổ Túi đồ / Kỹ năng cố định, vừa 1024x576
+const INV_SLOTS := 18                      # 6 x 3 ô
+## Trang Kỹ năng: tên (khóa trong World.UPGRADES / UNLOCKS) -> [tên hiện, tóm tắt, [mô tả từng cấp]].
+## Chiêu không có cấp (Bức tường lửa, Đèn đôi, Một trong số họ) chỉ hiện thông tin.
+const UPGRADE_TEXT := {
+	"kindle": ["Mồi lửa", "Thắp lại đèn tắt hoặc nến tàn ở ô kề. Hồi chiêu 8 s.",
+		["Đèn vừa thắp sáng rộng thêm 1 ô trong 10 s", "Hồi chiêu 8 → 6 s"]],
+	"bandage": ["Băng bó", "Đứng yên 3 s ở chỗ đủ sáng để hồi 10 máu. Hồi chiêu 20 s.", ["Hồi 15 máu", "Hồi 25 máu"]],
+	"fire_wall": ["Bức tường lửa", "Ném chai dầu thành vệt lửa 3 ô trong 8 s. Tu sĩ quay đầu, Boss 2 mất máu như trúng một cây đèn. Hồi chiêu 50 s.", []],
+	"twin_lamp": ["Đèn đôi", "Mang 2 đèn cùng sáng. Phím 4 đổi đèn cầm tay với đèn đeo lưng.", []],
+	"lamp_keeper": ["Người giữ đèn", "Nến cầm theo cháy lâu hơn.", ["Lâu gấp rưỡi", "Lâu gấp đôi"]],
+	"max_hp": ["Máu tối đa", "Máu tối đa 100. Tăng bao nhiêu hồi bấy nhiêu.", ["110 máu", "125 máu"]],
+	"quick_hands": ["Tay quen", "Chiêu 1, 2, 3 hồi nhanh hơn.", ["Nhanh hơn 10%", "Nhanh hơn 25%"]],
+	"thick_skin": ["Da dày", "Mất máu trong bóng tối ít hơn (gốc: tối hẳn 10, mờ 4 máu/s).",
+		["Tối hẳn 9, mờ 3 máu/s", "Tối hẳn 8, mờ 2 máu/s"]],
+	"shadow_hunter": ["Thợ săn bóng", "Quái bóng tối chết nhanh hơn trong sáng (gốc 2 s).", ["Chết sau 1,75 s", "Chết sau 1,5 s"]],
+	"swallow_light": ["Nuốt sáng", "Tắt một nguồn sáng trong 3 ô trong 8 s. Hồi chiêu 10 s.", ["Hiệu lực 12 s", "Tầm 5 ô"]],
+	"call_shadow": ["Gọi bóng", "Sinh vật bóng tối trong 3 ô tới ô tối chỉ định, đứng 10 s. Hồi chiêu 12 s.",
+		["Tầm 5 ô, đứng 15 s", "Gọi 2 sinh vật"]],
+	"one_of_them": ["Một trong số họ", "Hương áo choàng tu sĩ thôi làm Clara choáng: mặc không giới hạn thời gian.", []],
+	"regen": ["Hồi phục", "Hồi máu trong vùng an toàn (gốc 2 máu/s).", ["3 máu/s", "4 máu/s"]],
+	"hood": ["Mũ trùm", "Bỏng ánh sáng ít hơn (gốc 7 máu/s).", ["6 máu/s", "5 máu/s"]],
+	"fast_wake": ["Tỉnh nhanh", "Thanh virus giảm nhanh hơn (gốc 20 mỗi giây).", ["25 mỗi giây", "30 mỗi giây"]],
+	"night_eye": ["Mắt đêm+", "Vật phẩm phát sáng mờ để dễ tìm trong tối.", ["Trong 4 ô", "Trong 7 ô"]],
+}
 
 var has_save := false
 var in_game := false          # false = đang ở màn tiêu đề
@@ -23,6 +49,7 @@ var music_volume := 0.8
 var _page: Control
 var _back: Callable = Callable()
 var _combine := -1            # field_287/288: món đang chờ ghép, -1 = không
+var _skill_snap: Array = []   # trang Kỹ năng: [upgrades, max_energy, energy] trước khi cộng thử; rỗng = không có gì chưa lưu
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -52,12 +79,13 @@ func _theme() -> Theme:
 	t.set_color("font_hover_color", "Button", Color(1, 0.9, 0.6))
 	t.set_color("font_focus_color", "Button", Color(1, 0.9, 0.6))
 	t.set_color("font_disabled_color", "Button", Color(0.5, 0.47, 0.42))
-	t.set_stylebox("normal", "Button", _box(Color(0.1, 0.075, 0.06, 0.9), FRAME.darkened(0.45)))
-	t.set_stylebox("hover", "Button", _box(Color(0.18, 0.12, 0.08, 0.95), FRAME))
-	t.set_stylebox("focus", "Button", _box(Color(0.22, 0.15, 0.09, 0.95), Color(1, 0.82, 0.35)))
-	t.set_stylebox("pressed", "Button", _box(Color(0.3, 0.2, 0.1), Color(1, 0.82, 0.35)))
-	t.set_stylebox("disabled", "Button", _box(Color(0.08, 0.07, 0.06, 0.7), Color(0.25, 0.22, 0.2)))
-	t.set_stylebox("panel", "PanelContainer", Hud.panel_style(FRAME))
+	t.set_font("font", "Button", Hud.title_font)
+	t.set_stylebox("normal", "Button", Hud.plate_style(Color.WHITE, 12))
+	t.set_stylebox("hover", "Button", Hud.plate_style(Color(1.25, 1.1, 0.9), 12))
+	t.set_stylebox("focus", "Button", Hud.focus_style())
+	t.set_stylebox("pressed", "Button", Hud.plate_style(Hud.TINT_SELECTED, 12))
+	t.set_stylebox("disabled", "Button", Hud.plate_style(Hud.TINT_DIM, 12))
+	t.set_stylebox("panel", "PanelContainer", Hud.frame_style())
 	return t
 
 # --- trang ---
@@ -66,10 +94,21 @@ func open_title() -> void:
 	in_game = false
 	_show(_list("THE LAST LANTERN II", "Ashwood chìm trong bóng tối", [
 		["Chơi tiếp", _start.bind(continue_game), not has_save],
-		["Trò chơi mới", _start.bind(new_game)],
+		["Trò chơi mới", open_hero_select],
 		["Cài đặt", open_settings.bind(open_title)],
 		["Thoát", _confirm_quit.bind(open_title)],
 	]), Callable())
+
+func open_hero_select() -> void:
+	_show(_list("CHỌN NHÂN VẬT", "Bản lưu cũ sẽ bị ghi đè." if has_save else "", [
+		["Daniel — người mang đèn", _start_hero.bind("daniel")],
+		["Clara — đứa trẻ của bóng tối", _start_hero.bind("clara")],
+		["Quay lại", open_title],
+	]), open_title)
+
+func _start_hero(hero: String) -> void:
+	_close()
+	new_game.emit(hero)
 
 func _start(sig: Signal) -> void:
 	_close()
@@ -189,6 +228,7 @@ func _row_icon(frame: int, text: String) -> HBoxContainer:
 
 func open_inventory(back: Callable) -> void:
 	var box := _panel("TÚI ĐỒ")
+	_tabs(box, false, back)
 	var info := Label.new()
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	info.add_theme_font_size_override("font_size", 20)
@@ -229,6 +269,127 @@ func open_inventory(back: Callable) -> void:
 		grid.add_child(b)
 	box.add_child(_button("Đóng", back))
 	_show(box.get_parent(), back)
+
+## Hai nút chuyển trang dưới tiêu đề túi đồ: Túi đồ | Kỹ năng (N điểm).
+func _tabs(box: VBoxContainer, skills: bool, back: Callable) -> void:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 8)
+	for t in [["Túi đồ", false], ["Kỹ năng (%d điểm)" % world.upgrade_points(), true]]:
+		var b := Button.new()
+		b.text = t[0]
+		b.custom_minimum_size = Vector2(240, 0)
+		b.mouse_entered.connect(b.grab_focus)
+		if t[1] == skills:
+			b.add_theme_stylebox_override("normal", _box(Color(0.25, 0.17, 0.08), Color(1, 0.82, 0.35), 4))
+		else:
+			b.pressed.connect(_discard_then.bind(open_skills.bind(back) if t[1] else open_inventory.bind(back)))
+		row.add_child(b)
+	box.add_child(row)
+	box.move_child(row, 1)
+
+## Spec mục 6b. Bấm + là mua thử ngay trên world; Lưu thì chốt, rời trang chưa lưu thì trả lại như cũ.
+func open_skills(back: Callable) -> void:
+	if _skill_snap.is_empty():
+		_skill_snap = [world.upgrades.duplicate(), world.max_energy, world.energy]
+	var box := _panel("TÚI ĐỒ")
+	_tabs(box, true, back)
+	var info := Label.new()
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.custom_minimum_size = Vector2(620, 48)
+	info.add_theme_font_size_override("font_size", 18)
+	info.text = "Trỏ vào một dòng để xem mô tả."
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 4)
+	box.add_child(rows)
+	var table: Dictionary = World.UPGRADES[world.hero]
+	for n in table:
+		var u: Array = table[n]
+		var lv := world.upgrade_level(n)
+		var saved := int(_skill_snap[0].get(n, 0))
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		row.mouse_filter = Control.MOUSE_FILTER_PASS
+		var ic := TextureRect.new()
+		ic.texture = Hud.skill_icon(world.hero, n)
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_SCALE
+		ic.custom_minimum_size = Vector2(40, 40)
+		row.add_child(ic)
+		var name_l := Label.new()
+		name_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		name_l.text = UPGRADE_TEXT[n][0]
+		name_l.custom_minimum_size = Vector2(240, 0)
+		row.add_child(name_l)
+		var lv_l := Label.new()
+		lv_l.text = "%d/%d" % [lv, u[0]]
+		lv_l.custom_minimum_size = Vector2(90, 0)
+		lv_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(lv_l)
+		var cost := Label.new()
+		cost.custom_minimum_size = Vector2(160, 0)
+		cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		cost.add_theme_font_size_override("font_size", 18)
+		row.add_child(cost)
+		if lv >= u[0]:
+			cost.text = "Tối đa"
+			for l in [name_l, lv_l, cost]:
+				l.add_theme_color_override("font_color", MAXED)
+		elif world.bosses_down < u[2]:
+			cost.text = "Sắp mở khóa"
+			row.modulate = DIMMED
+		else:
+			cost.text = "%d điểm" % u[1]
+			if not world.can_buy(n):
+				row.modulate = DIMMED
+		if lv > saved:
+			lv_l.add_theme_color_override("font_color", Color(1, 0.82, 0.35))
+		var plus := Button.new()
+		plus.text = "+"
+		plus.custom_minimum_size = Vector2(56, 0)
+		plus.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		for st in ["normal", "hover", "focus", "pressed", "disabled"]:   # nút nhỏ vừa dòng 40 px
+			var sb := (theme if theme else _theme()).get_stylebox(st, "Button").duplicate() as StyleBoxFlat
+			sb.set_content_margin_all(2)
+			plus.add_theme_stylebox_override(st, sb)
+		plus.disabled = not world.can_buy(n)
+		plus.pressed.connect(func():
+			world.buy(n)
+			open_skills(back))
+		var show_desc := func(): info.text = UPGRADE_TEXT[n][1]
+		plus.focus_entered.connect(show_desc)
+		plus.mouse_entered.connect(show_desc)
+		row.mouse_entered.connect(show_desc)
+		row.add_child(plus)
+		rows.add_child(row)
+	box.add_child(info)
+	var foot := HBoxContainer.new()
+	foot.add_theme_constant_override("separation", 12)
+	var pts := Label.new()
+	pts.text = "Điểm còn lại: %d" % world.upgrade_points()
+	pts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	foot.add_child(pts)
+	var save := _button("Lưu", func():
+		_skill_snap = []
+		open_skills(back))
+	save.disabled = world.upgrades == _skill_snap[0]
+	for b in [save, _button("Đóng", _discard_then.bind(back))]:
+		b.custom_minimum_size = Vector2(150, 0)
+		foot.add_child(b)
+	box.add_child(foot)
+	_show(box.get_parent(), _discard_then.bind(back))
+
+func _discard_skills() -> void:
+	if _skill_snap.is_empty():
+		return
+	world.upgrades = _skill_snap[0]
+	world.max_energy = _skill_snap[1]
+	world.energy = _skill_snap[2]
+	_skill_snap = []
+
+func _discard_then(then: Callable) -> void:
+	_discard_skills()
+	then.call()
 
 func _confirm_quit(back: Callable) -> void:
 	_show(_list("THOÁT GAME?", "Tiến trình từ lần tự lưu gần nhất vẫn còn.", [
@@ -301,6 +462,7 @@ func _show(page: Control, back: Callable) -> void:
 		first[0].grab_focus.call_deferred()
 
 func _close() -> void:
+	_discard_skills()
 	_combine = -1
 	if _page:
 		_page.queue_free()

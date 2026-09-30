@@ -1,7 +1,7 @@
 class_name CameraRig
 extends Node3D
 ## Camera 2.5D: nhìn xuống ~55°, bám mượt theo mục tiêu. Con: Camera3D.
-## Kiểu B: trực giao, 1 ô = TEXELS_PER_TILE pixel, vị trí khoá theo lưới pixel để hình không rung/nhòe khi trượt.
+## Kiểu B: trực giao nhìn thẳng xuống, 1 ô = TEXELS_PER_TILE pixel, vị trí khoá theo lưới pixel để hình không rung/nhòe khi trượt.
 
 @export var target: Node3D
 @export var pitch_deg := 55.0
@@ -19,6 +19,7 @@ func _ready() -> void:
 		cam.projection = Camera3D.PROJECTION_ORTHOGONAL
 		pitch_deg = LevelBuilder.B_PITCH
 		distance = 20.0
+		cam.far = 40.0   # các lớp frame phẳng chỉ cách nhau vài phần nghìn: cần độ sâu mịn
 	add_child(cam)
 	rotation_degrees.x = -pitch_deg
 	cam.position = Vector3(0, 0, distance)

@@ -17,10 +17,10 @@ func test_dark_damage_after_2_to_3_seconds() -> void:
 	r.tick(1_998)
 	eq(r.s.energy, r.s.max_energy, "chưa tới 2 s")
 	r.tick(1_002)      # tổng 3000 ms: bộ đếm tối đa 2999 xuống < 0
-	eq(r.s.energy, r.s.max_energy - 1, "mất 1 sau tối đa 3 s")
+	eq(r.s.energy, r.s.max_energy - World.HP_PER_PIP, "mất 1 nấc sau tối đa 3 s")
 	r.tick(1)
 	r.tick(3_000)
-	eq(r.s.energy, r.s.max_energy - 2, "lặp lại")
+	eq(r.s.energy, r.s.max_energy - 2 * World.HP_PER_PIP, "lặp lại")
 
 func test_hurt_and_death_events() -> void:
 	var r := _dark_rules()
@@ -46,4 +46,4 @@ func test_back_into_dark_waits_800ms() -> void:
 	r.tick(799)
 	eq(s.energy, s.max_energy, "chưa tới 800 ms")
 	r.tick(2)
-	eq(s.energy, s.max_energy - 1, "quay lại tối: 800 ms là mất")
+	eq(s.energy, s.max_energy - World.HP_PER_PIP, "quay lại tối: 800 ms là mất")

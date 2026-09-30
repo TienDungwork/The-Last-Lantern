@@ -58,6 +58,27 @@ func _initialize() -> void:
 						game.world.map_markers[int(c.args[0])] = true
 		game.menu.world = game.world
 		game.menu.open_map(game.menu._close, true)
+	if "--hero" in args:   # --hero clara
+		game.world.hero = args[args.find("--hero") + 1]
+		game.skills = Skills.new(game.state)
+	if "--cd" in args:   # --cd: giả lập đã hạ Boss 1, chiêu 1 đang hồi, chiêu 2 đang băng
+		game.world.bosses_down = 1
+		game.skills.cd["kindle"] = 5200
+		game.skills.bandage_ms = 1500
+		game.hud.toast(Skills.TOO_DARK)
+	if "--inv" in args:   # --inv: trang Túi đồ với vài món
+		for id in [21, 21, 21, 6, 33, 7, 3, 0, 22]:
+			game.world.add_item(id)
+		game.menu.world = game.world
+		game.menu.open_inventory(game.menu._close)
+	if "--skills" in args:   # --skills: trang Kỹ năng với 7 điểm, đã mua vài cấp, 1 cấp chưa lưu
+		for i in 7:
+			game.world.add_item(21)
+		game.world.upgrades = {"max_hp": 2, "thick_skin": 1} if game.world.hero == "daniel" else {"max_hp": 2, "hood": 1}
+		game.menu.world = game.world
+		game.menu.open_skills(game.menu._close)
+		game.world.buy(game.world.UPGRADES[game.world.hero].keys()[0])
+		game.menu.open_skills(game.menu._close)
 	for i in frames:
 		await process_frame
 	var path := ProjectSettings.globalize_path("res://").path_join(out)

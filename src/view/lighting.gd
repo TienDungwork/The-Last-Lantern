@@ -85,6 +85,15 @@ func setup_environment() -> void:
 	we.environment = env
 	add_child(we)
 
+## method_139: đèn nằm dưới đất theo loại 0/1/2 và bật/tắt.
+## ponytail: chưa vẽ ngọn lửa chớp 252/253 trên đèn loại 2 đang cháy (method_138).
+static func lamp_frame(L: Dictionary) -> int:
+	var on := int(L.on) == 1
+	match int(L.type):
+		0: return 248 if on else 249
+		1: return ActorView.HELD_LIGHT[maxi(int(L.dir), 1) - 1] if on else 247
+	return 251 if on else 250
+
 func sync(s: GridState, field: Array, builder: LevelBuilder) -> void:
 	# Kiểu B: sàn giữ màu texture, để đèn thật tỏa mềm thay vì tô từng ô.
 	for p in builder.floors if LevelBuilder.art != "B" else []:
@@ -99,9 +108,9 @@ func sync(s: GridState, field: Array, builder: LevelBuilder) -> void:
 	for i in s.lights.size():
 		var L: Dictionary = s.lights[i]
 		if int(L.type) in [0, 1, 2] and i != s.carried and LevelBuilder.art == "B":
-			var sp := LevelBuilder.sprite("ad_14")
+			var sp := LevelBuilder.frame_sprite(lamp_frame(L))
 			sp.shaded = int(L.on) == 0   # đèn đang cháy tự sáng
-			sp.position = LevelBuilder.world_pos(Vector2i(int(L.x), int(L.y)))
+			sp.position = Vector3(int(L.x) - 0.5, LevelBuilder.depth(int(L.y)), int(L.y) - 0.5)
 			add_child(sp)
 			_props.append(sp)
 		elif int(L.type) in [0, 1, 2] and i != s.carried:   # đèn nhặt được nằm dưới đất

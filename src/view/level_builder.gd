@@ -5,70 +5,56 @@ extends Node3D
 
 const TILE := 1.0
 ## Thử phong cách hình ảnh (snap.gd: --art A|B|box):
-##   "box" khối hộp xám; "A" mô hình 3D ghép khối + toon + viền; "B" HD-2D: sprite pixel (image/new) + texture pixel.
+##   "box" khối hộp xám; "A" mô hình 3D ghép khối + toon + viền;
+##   "B" nhìn thẳng từ trên xuống như bản gốc: frame gốc trên atlas vẽ lại ×4 (image/img) nằm phẳng, đèn 3D.
 static var art := "B"
-const B_PITCH := 70.0           # góc nhìn xuống của camera kiểu B
-## Kiểu B: 1 ô = 32 pixel trên cảnh render thấp (game.gd), 1 texel sprite = đúng 1 pixel đó.
-const TEXELS_PER_TILE := 32.0
-
-const ART_FENCE := "aa_14"      # vật chắn đường không chắn sáng, xếp thành hàng
-const ART_BOX := "aa_09"
-const ART_WALL := "aa_12"       # tường chắn sáng: cụm cọc sắt rộng đúng 1 ô
-const ART_DIM := ["ak_03", "ad_09", "ad_10"]
-const ART_PROPS := ["aa_19", "aa_20", "ai_02", "ak_05", "ao_01", "an_01", "al_01", "aa_10", "ad_02", "aa_08"]
+const B_PITCH := 90.0           # góc nhìn xuống của camera kiểu B
+## Kiểu B: 1 ô = 16 px gốc × Portraits.SCALE = 64 pixel màn hình, 1 texel = đúng 1 pixel.
+const TEXELS_PER_TILE := 64.0
+## Kiểu B: vật hàng dưới đè hàng trên và đè người đứng hàng trên (method_107/108 vẽ lại các ô phía dưới người chơi).
+const DEPTH_ROW := 0.002
+const FLAT_FRAMES := [31, 36, 130, 135, 159]   # method_107: frame sát đất, không đè người chơi
+const DARK_FLOOR_UNDER := [40, 41, 42, 44, 46, 47, 48, 50, 62, 63]   # ô sàn dưới các frame này vẽ frame tối
 const FENCE_TILES := [92]
 
 var floors: Dictionary = {}   # Vector2i -> MeshInstance3D
 var objects: Dictionary = {}  # Vector2i -> Node3D
 var boxes: Dictionary = {}    # Vector2i -> Node3D (hộp đẩy được, nằm ngoài lưới)
+var _floor_mesh: MeshInstance3D   # kiểu B: cả sàn một ảnh
+var _event_views: Array = []      # kiểu B: frame của sự kiện đang bật
+var _event_key := ""
 
 static func world_pos(p: Vector2i, y: float = 0.0) -> Vector3:
 	return Vector3(p.x * TILE, y, p.y * TILE)
 
-## Sprite đứng trên gốc (chân ảnh ở origin), cỡ gốc 1 texel = 1 pixel, chịu ánh sáng đèn, có bóng tròn dưới chân.
-static func sprite(name: String) -> Sprite3D:
-	var s := Sprite3D.new()
-	s.texture = load("res://assets/new/%s.png" % name)
-	s.pixel_size = 1.0 / TEXELS_PER_TILE
-	s.offset.y = s.texture.get_height() / 2.0
-	# Đứng thẳng quay về camera (camera không xoay ngang), kéo cao bù góc nhìn: lên màn hình đúng 1 texel = 1 pixel.
-	# Không ngả theo camera: ngả thì đầu cắm vào tường phía sau.
-	s.scale.y = 1.0 / cos(deg_to_rad(B_PITCH))
-	var width := s.texture.get_width() * s.pixel_size
-	s.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
-	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	s.shaded = true
-	s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var shadow := MeshInstance3D.new()
-	var q := PlaneMesh.new()
-	q.size = Vector2(width, width * 0.5)
-	shadow.mesh = q
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = load("res://assets/new/ae_01.png")
-	mat.albedo_color = Color(0, 0, 0, 0.8)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	shadow.material_override = mat
-	shadow.position.y = 0.01
-	s.add_child(shadow)
-	return s
+## Độ cao vẽ của thứ nằm ở hàng z (toạ độ thế giới): hàng dưới cao hơn, camera từ trên nhìn thấy đè lên.
+static func depth(z: float) -> float:
+	return 0.02 + (z + 1.0) * DEPTH_ROW
 
-## Frame gốc (16 px mỗi ô), origin = góc trên trái ô như method_55; trục y của sprite = hướng bắc của ảnh.
-## ponytail: dùng hình gốc vì bộ sprite AI chưa có con chó / biển PUB; vẽ lại thì thay bằng sprite().
+## Frame gốc nằm phẳng trên sàn; origin = góc trên trái ô như method_55, trục y của ảnh = hướng bắc (-z).
 static func frame_sprite(frame: int) -> Sprite3D:
 	var s := Sprite3D.new()
-	s.pixel_size = TILE / 16.0
+	s.pixel_size = TILE / TEXELS_PER_TILE
 	s.centered = false
-	s.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	s.rotation.x = -PI / 2
+	s.alpha_cut = SpriteBase3D.ALPHA_CUT_OPAQUE_PREPASS   # viền mềm của ảnh vẽ lại vẫn trộn nền
 	s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	set_frame(s, frame)
 	return s
 
 static func set_frame(s: Sprite3D, frame: int) -> void:
 	var f := Portraits.frame(frame)
 	s.texture = Portraits.texture(frame)
-	s.offset = Vector2(-f.anchor.x, f.anchor.y - f.rect.size.y)
+	s.offset = Vector2(-f.anchor.x, f.anchor.y - f.rect.size.y) * Portraits.SCALE
 	s.set_meta("frame", frame)
+
+## Frame phẳng vẽ tại góc trên trái ô p (+ lệch dx, dy px gốc), ở độ cao hàng.
+func _put_frame(frame: int, p: Vector2i, dx := 0, dy := 0) -> Sprite3D:
+	var s := frame_sprite(frame)
+	s.position = Vector3(p.x - 0.5 + dx / 16.0, depth(p.y), p.y - 0.5 + dy / 16.0)
+	add_child(s)
+	return s
 
 ## SPECIAL 13 (method_190): cây chết ở tối đa 3 ô; SPECIAL 14 (method_193/191/192): biển PUB, chữ B chớp tắt.
 func _decor(s: GridState) -> void:
@@ -80,19 +66,19 @@ func _decor(s: GridState) -> void:
 		match int(e.commands[0].args[0]):
 			13 when trees < 3:
 				trees += 1
-				var t := sprite("ao_00")
-				t.scale *= 54.0 * 2 / t.texture.get_width()   # rộng bằng frame 129 gốc (54 px)
-				t.position = world_pos(at) + Vector3(0, 0, -0.5)
-				add_child(t)
+				if art == "B":
+					_put_frame(129, at)
+				else:
+					var t := frame_sprite(129)
+					t.position = world_pos(at) - Vector3(0.5, -0.02, 0.5)
+					add_child(t)
 			14:
-				var pub := frame_sprite(119)
+				var pub := _put_frame(119, at)
 				pub.shaded = false
-				pub.scale.y = 1.0 / cos(deg_to_rad(B_PITCH))
-				pub.position = world_pos(at) + Vector3(-0.5, 1.5, -0.5)   # ponytail: treo tạm trên nóc nhà, bản gốc vẽ phẳng
-				add_child(pub)
 				var b := frame_sprite(120)
 				b.shaded = false
-				b.position.z = 0.01
+				b.rotation = Vector3.ZERO
+				b.position.z = 0.0005   # trong hệ toạ độ biển (đã nằm phẳng): nhích về phía camera
 				pub.add_child(b)
 				var timer := Timer.new()
 				timer.timeout.connect(_flicker.bind(b, timer))
@@ -132,30 +118,23 @@ static func part(parent: Node3D, mesh: Mesh, color: Color, pos: Vector3) -> Mesh
 	parent.add_child(mi)
 	return mi
 
-## Texture lát theo toạ độ thế giới, mật độ TEXELS_PER_TILE texel mỗi đơn vị.
-static func _pixel_tex(path: String) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	var tex: Texture2D = load(path)
-	m.albedo_texture = tex
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	m.uv1_triplanar = true
-	m.uv1_world_triplanar = true
-	var sx := TEXELS_PER_TILE / tex.get_width()
-	m.uv1_scale = Vector3(sx, TEXELS_PER_TILE / tex.get_height(), sx)
-	return m
-
 func build(s: GridState) -> void:
 	for c in get_children():
 		c.queue_free()
 	floors.clear()
 	objects.clear()
 	boxes.clear()
+	_event_views.clear()
+	_event_key = ""
+	if art == "B":
+		_bake_floor(s)
 	for y in s.level.height:
 		for x in s.level.width:
 			_place(s, Vector2i(x, y))
 	for p in s.boxes:
 		boxes[p] = _block(p, s.boxes[p])
 	_decor(s)
+	sync_events(s)
 
 func move_box(from: Vector2i, to: Vector2i) -> void:
 	var mi: Node3D = boxes[from]
@@ -163,30 +142,53 @@ func move_box(from: Vector2i, to: Vector2i) -> void:
 	boxes[to] = mi
 	var y := mi.position.y
 	create_tween().tween_property(mi, "position", world_pos(to, y), ActorView.STEP_TIME)
+	if art == "B":
+		(mi.get_child(0) as Node3D).position.y = depth(to.y)
 
 func rebuild_tile(s: GridState, p: Vector2i) -> void:
 	for d in [floors, objects]:
 		if d.has(p):
 			d[p].queue_free()
 			d.erase(p)
+	if art == "B":
+		_bake_floor(s)   # ô sàn dưới vật có thể đổi sang frame tối/sáng
 	_place(s, p)
+
+## Kiểu B: ghép sàn cả màn thành một ảnh như df2_render_maps.py (frame 32x32 neo giữa, vẽ từ dưới phải lên trên trái).
+func _bake_floor(s: GridState) -> void:
+	var k := Portraits.SCALE
+	var w := s.level.width
+	var h := s.level.height
+	var img := Image.create(w * 16 * k, h * 16 * k, false, Image.FORMAT_RGBA8)
+	var ff: Array = LevelData.floor_frames()[s.level.tileset]
+	for y in range(h - 1, -1, -1):
+		for x in range(w - 1, -1, -1):
+			var f := Portraits.frame(ff[0] if (s.tiles[y][x] - 8) in DARK_FLOOR_UNDER else ff[7])
+			img.blend_rect(Portraits.image(f.png), Rect2i(f.rect.position * k, f.rect.size * k),
+				Vector2i(x * 16 - int(f.anchor.x), y * 16 - int(f.anchor.y)) * k)
+	if _floor_mesh == null or not is_instance_valid(_floor_mesh) or _floor_mesh.is_queued_for_deletion():
+		_floor_mesh = MeshInstance3D.new()
+		var m := PlaneMesh.new()
+		m.size = Vector2(w, h) * TILE
+		_floor_mesh.mesh = m
+		_floor_mesh.position = Vector3((w - 1) / 2.0, 0, (h - 1) / 2.0) * TILE
+		var mat := StandardMaterial3D.new()
+		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		_floor_mesh.material_override = mat
+		add_child(_floor_mesh)
+	(_floor_mesh.material_override as StandardMaterial3D).albedo_texture = ImageTexture.create_from_image(img)
 
 func _place(s: GridState, p: Vector2i) -> void:
 	var t: int = s.tiles[p.y][p.x]
 	if t >= 8:
 		objects[p] = _block(p, t)
+	if art == "B":
+		return
 	var mi := MeshInstance3D.new()
 	var m := PlaneMesh.new()
 	m.size = Vector2(TILE, TILE)
 	mi.mesh = m
-	var mat: StandardMaterial3D
-	match art:
-		"B":
-			mat = StandardMaterial3D.new()
-			mat.albedo_texture = load("res://assets/new/tex_floor.png")
-			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-		"A": mat = toon(Color(0.08, 0.08, 0.1))
-		_: mat = StandardMaterial3D.new()
+	var mat: StandardMaterial3D = toon(Color(0.08, 0.08, 0.1)) if art == "A" else StandardMaterial3D.new()
 	mat.next_pass = null
 	mi.position = world_pos(p)
 	floors[p] = mi
@@ -196,7 +198,7 @@ func _place(s: GridState, p: Vector2i) -> void:
 func _block(p: Vector2i, t: int) -> Node3D:
 	var props := LevelData.tile_props(t)
 	var wall := int(props.blocks_light) == 1 and int(props.movable) == 0
-	if art == "B" and not wall:
+	if art == "B":
 		return _block_b(p, t, props)
 	if art == "A" and not wall:
 		return _block_a(p, t, props)
@@ -210,9 +212,7 @@ func _block(p: Vector2i, t: int) -> Node3D:
 		mat.albedo_color = Color(0.35, 0.33, 0.3)
 	else:
 		mat.albedo_color = Color(0.5, 0.45, 0.4)
-	if wall and art == "B":
-		mat = _pixel_tex("res://assets/new/tex_wall.png")
-	elif art == "A":
+	if art == "A":
 		mat = toon(Color(0.36, 0.34, 0.3))
 	var m := BoxMesh.new()
 	m.size = Vector3(TILE, h, TILE)
@@ -220,25 +220,67 @@ func _block(p: Vector2i, t: int) -> Node3D:
 	mi.position = world_pos(p, h / 2.0)
 	mi.material_override = mat
 	add_child(mi)
-	if wall and art == "B":   # hộp chỉ còn đổ bóng chắn đèn; hình là cọc sắt đứng như bản đồ 2D nhìn từ trên
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
-		var s := sprite(ART_WALL)
-		s.position.y = -h / 2.0
-		mi.add_child(s)
 	return mi
 
+## Kiểu B: frame gốc (giá trị ô - 8) nằm phẳng; ô chắn sáng thêm hộp vô hình chỉ để đổ bóng đèn.
+## ponytail: luôn vẽ frame "sáng"; bản gốc ẩn vật ở ô tối và đổi vài frame mép tường (method_134, 190-194).
 func _block_b(p: Vector2i, t: int, props: Dictionary) -> Node3D:
-	var name: String = ART_PROPS[t % ART_PROPS.size()]
-	if int(props.movable) == 1:
-		name = ART_BOX
-	elif t in FENCE_TILES:
-		name = ART_FENCE
-	elif int(props.dim_light) == 1:
-		name = ART_DIM[t % ART_DIM.size()]
-	var s := sprite(name)
-	s.position = world_pos(p)
-	add_child(s)
-	return s
+	var n := Node3D.new()
+	n.position = world_pos(p)
+	add_child(n)
+	var f := t - 8
+	var s := frame_sprite(f)
+	s.position = Vector3(-0.5, 0.005 if f in FLAT_FRAMES else depth(p.y), -0.5)
+	n.add_child(s)
+	if int(props.blocks_light) == 1:
+		var mi := MeshInstance3D.new()
+		var m := BoxMesh.new()
+		m.size = Vector3(TILE, 1.0, TILE)
+		mi.mesh = m
+		mi.position.y = 0.5
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+		n.add_child(mi)
+	return n
+
+## Kiểu B: frame của sự kiện đang bật (vật phẩm, công tắc, đồ trang trí), như df2_render_maps.event_sprite.
+## Gọi sau mỗi lượt xử lý; chỉ dựng lại khi danh sách đổi.
+func sync_events(s: GridState) -> void:
+	if art != "B":
+		return
+	var list := []
+	for e in s.events:
+		if e.has("x") and not e.commands.is_empty() and s.event_active[int(e.id)]:
+			var sp := _event_frame(s, e.commands[0])
+			if sp[0] >= 0:
+				list.append([Vector2i(int(e.x), int(e.y))] + sp)
+	var key := str(list)
+	if key == _event_key:
+		return
+	_event_key = key
+	for v in _event_views:
+		v.queue_free()
+	_event_views.clear()
+	for it in list:
+		_event_views.append(_put_frame(it[1], it[0], it[2], it[3]))
+
+## [frame, dx, dy] của lệnh đầu sự kiện; frame -1 = không vẽ.
+static func _event_frame(s: GridState, c: Dictionary) -> Array:
+	var a: Array = c.args
+	var s8 := func(v): return int(v) - 256 if int(v) > 127 else int(v)
+	match int(c.op):
+		26, 29:
+			var f := (int(a[0]) << 8) | int(a[1])
+			return [-1 if f == 0xFFFF else f, s8.call(a[2]) if int(c.op) == 29 else 0, s8.call(a[3]) if int(c.op) == 29 else 0]
+		10:
+			var i: int = s8.call(a[0])
+			return [int(LevelData.item(i).frame) if i >= 0 else -1, 0, 0]
+		23:
+			var id := int(a[0]) & 127
+			var on := id < s.lights.size() and int(s.lights[id].on) == 1
+			return [(57 if on else 58) if int(a[0]) & 128 else (54 if on else 55), 0, 0]
+		17:
+			return [64, 0, 0]
+	return [-1, 0, 0]
 
 func _block_a(p: Vector2i, t: int, props: Dictionary) -> Node3D:
 	var n := Node3D.new()

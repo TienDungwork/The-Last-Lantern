@@ -160,7 +160,9 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			run(callee, actor if int(callee.flags) & GridState.F_BY_ACTOR else -1)
 		23:
 			st.toggle_bulb(int(a[0]) & 0x7F)
-		25:   # method_209 case 25: hồi đầy năng lượng kèm câu 234
+		25:   # method_209 case 25: hai viên pin + câu 234 ("mở khóa cửa sau, nhận hai viên pin"), hồi đầy năng lượng
+			st.world.add_item(World.BATTERY)
+			st.world.add_item(World.BATTERY)
 			st.out.append({"type": "say", "text_id": 234, "portrait": -1})
 			st.energy = st.max_energy
 		26, 29:
@@ -189,12 +191,15 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 						return false
 					st.sun_beam = {}   # ponytail: bản gốc chiếu hoạt cảnh tia sáng 6 s rồi mới tắt (field_341)
 				2: st.spawn_boss(Vector2i(int(e.x), int(e.y)))
-				8: st.boss = {}
+				8:
+					st.boss = {}
+					st.world.bosses_down = maxi(st.world.bosses_down, 1)
 				10: st.spawn_boss2(Vector2i(int(e.x), int(e.y)))
 				11: st.add_fireball(Vector2i(int(e.x), int(e.y)))
 				12:
 					st.boss2 = {}
 					st.fireballs.clear()
+					st.world.bosses_down = 2
 				17:   # method_217 + field_121/122: bảng thống kê, mã thưởng, mã minigame đã tìm, hết game
 					var w := st.world
 					st.out.append({"type": "say", "text_id": 246, "portrait": -1, "args":

@@ -20,7 +20,7 @@ const GUARD_SIGHT := 4               # nửa ô (= 2 ô)
 const CLOAK := 20                    # Áo choàng tu sĩ: tu sĩ không nhận ra, tối không mất máu
 const CREATURE_SLOTS := 16
 const CREATURE_TILE_MS := 200        # method_236: sinh vật đi 1 ô mất 200 ms
-const CREATURE_HP_MS := 1000         # ở trong sáng đủ chừng này ms thì chết
+const CREATURE_HP_MS := [2000, 1750, 1500]   # ở trong sáng đủ chừng này ms thì chết, theo cấp Thợ săn bóng
 const NO_CREATURE_LEVELS := [14, 15] # class_10 dòng 1652: phố và sân trước nhà Benjamin không có sinh vật
 enum { C_WAIT = 1, C_MOVING = 2, C_DYING = 3, C_DECIDE = 4 }   # field_481
 const BOSS_TILE_MS := 800            # method_196: boss đi 1 ô mất 800 ms
@@ -33,6 +33,7 @@ const FLASH_MS := 1500               # field_160: flash máy ảnh sáng chừng
 
 var level: LevelData
 var world: World
+var _candle_acc := 0             # Người giữ đèn: đếm bước nến đang cầm
 var tiles: Array = []            # bản sao có thể đổi của level.grid
 var lights: Array = []           # bản sao có thể đổi của level.lights
 var events: Array = []           # bản sao sâu của level.events (COUNTER sửa số đếm trong đó)
@@ -120,8 +121,8 @@ func is_blocked(p: Vector2i) -> bool:
 		return true
 	return not in_bounds(p) or boxes.has(p) or is_solid(p)
 
-func hurt() -> void:
-	energy -= 1
+func hurt(amount: int = World.HP_PER_PIP) -> void:
+	energy = maxi(energy - amount, 0)
 	out.append({"type": "hurt", "energy": energy})
 	if energy <= 0:
 		out.append({"type": "death"})
@@ -371,7 +372,7 @@ func tick_guards(ms: int) -> void:
 func spawn_creature(at: Vector2i, dir: int, dist: int) -> void:
 	## method_233: có quãng đường thì đi tới đó, không thì đứng "nghĩ" (C_DECIDE).
 	var c := {"pos": at * CREATURE_TILE_MS, "from": at, "to": at, "dir": dir, "state": C_DECIDE,
-		"hp": CREATURE_HP_MS, "timer": 0, "age": 0}
+		"hp": CREATURE_HP_MS[world.upgrade_level("shadow_hunter")], "timer": 0, "age": 0}
 	if dist > 0:
 		c.state = C_MOVING
 		c.to = at + DIR_VEC.get(dir, Vector2i.ZERO) * dist
@@ -390,7 +391,7 @@ func creature_at(p: Vector2i) -> int:
 	return -1
 
 func tick_creatures(ms: int, rng: RandomNumberGenerator) -> void:
-	## method_236. Bị chiếu thì chạy về ô kề tối nhất; trong sáng đủ CREATURE_HP_MS thì chết.
+	## method_236. Bị chiếu thì chạy về ô kề tối nhất; trong sáng đủ CREATURE_HP_MS (2 s, Thợ săn bóng rút còn 1,75/1,5 s) thì chết.
 	## Đứng yên thì mỗi lần nghĩ: 10% biến mất, 63% chờ 1,5–3 s, còn lại đi sang ô kề tối nhất.
 	if level.index in NO_CREATURE_LEVELS:
 		return
@@ -401,7 +402,7 @@ func tick_creatures(ms: int, rng: RandomNumberGenerator) -> void:
 		var lvl := light_level(c.pos / CREATURE_TILE_MS)
 		if c.state != C_DYING:
 			if lvl == 0:
-				c.hp = CREATURE_HP_MS
+				c.hp = CREATURE_HP_MS[world.upgrade_level("shadow_hunter")]
 			else:
 				c.hp -= ms
 				if c.hp <= 0:
@@ -602,7 +603,12 @@ func _carry_light(dir: int) -> void:
 	if int(L.dir) != 0:
 		L.dir = dir
 	if int(L.type) == 2 and int(L.life) > 0:
-		L.life = int(L.life) - 1
+		# Người giữ đèn: bản gốc mất 1 life mỗi bước; cấp 1 mất 2 mỗi 3 bước, cấp 2 mất 1 mỗi 2 bước
+		_candle_acc += 2
+		var cost := 2 + world.upgrade_level("lamp_keeper")
+		while _candle_acc >= cost and int(L.life) > 0:
+			_candle_acc -= cost
+			L.life = int(L.life) - 1
 		L.radius = int(L.life) >> 1
 		if int(L.radius) == 0:
 			L.on = 0
@@ -623,9 +629,10 @@ func update_plates() -> void:
 				var q := Vector2i(x, y)
 				if in_bounds(q) and (tile_at(q) >= 8 or boxes.has(q)):
 					pressed = true
-		for L in lights:
-			if rect.has_point(Vector2i(int(L.x), int(L.y))):
-				pressed = true
+		for i in lights.size():
+			var L: Dictionary = lights[i]
+			if i != flash_light and rect.has_point(Vector2i(int(L.x), int(L.y))):
+				pressed = true   # đèn flash không đè bàn đạp nhưng vẫn chặn cửa (field_234 - 1 / method_142)
 			if int(L.x) == door.x and int(L.y) == door.y:
 				pressed = true   # đèn chặn cửa: không đóng được
 		if boxes.has(door):

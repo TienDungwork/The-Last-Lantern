@@ -25,6 +25,7 @@ func tick(dt_ms: int) -> void:
 	if s.energy <= 0:
 		return   # đã chết, chờ game.gd nạp lại màn
 	s.tick_timers(dt_ms)
+	s.update_plates()   # method_215 chạy mỗi khung hình: đặt đèn xuống bàn đạp là cửa mở ngay
 	s.tick_flash(dt_ms)
 	s.tick_guards(dt_ms)
 	s.tick_creatures(dt_ms, rng)
@@ -32,6 +33,9 @@ func tick(dt_ms: int) -> void:
 	s.tick_boss2(dt_ms, rng)
 	s.check_light_sensors()
 	light = s.light_map()   # GridState xóa bản đồ khi ô/đèn đổi; tính lại khi cần
+	_drain(dt_ms)
+
+func _drain(dt_ms: int) -> void:
 	if s.is_lit(s.player) or s.world.equipped == GridState.CLOAK:
 		if dark_timer >= 0:
 			dark_timer = -2

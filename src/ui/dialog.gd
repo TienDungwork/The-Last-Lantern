@@ -20,21 +20,12 @@ func _ready() -> void:
 	offset_left = 80
 	offset_right = -80
 	offset_bottom = -24
-	var sb := Hud.panel_style(FRAME)
-	sb.bg_color = Color(0.06, 0.045, 0.04, 0.92)
-	sb.set_border_width_all(4)
-	sb.set_content_margin_all(18)
-	add_theme_stylebox_override("panel", sb)
+	add_theme_stylebox_override("panel", Hud.frame_style(28))
 	var box := HBoxContainer.new()
 	box.add_theme_constant_override("separation", 22)
 	add_child(box)
 	_portrait_box = PanelContainer.new()
-	var psb := StyleBoxFlat.new()
-	psb.bg_color = Color(0.12, 0.09, 0.07)
-	psb.border_color = FRAME.darkened(0.3)
-	psb.set_border_width_all(3)
-	psb.set_content_margin_all(4)
-	_portrait_box.add_theme_stylebox_override("panel", psb)
+	_portrait_box.add_theme_stylebox_override("panel", Hud.plate_style(Color.WHITE, 8))
 	box.add_child(_portrait_box)
 	_portrait = TextureRect.new()
 	_portrait.custom_minimum_size = Vector2(128, 128)

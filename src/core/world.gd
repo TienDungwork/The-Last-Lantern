@@ -9,8 +9,8 @@ enum { ENABLE, DISABLE, SET_TILE, SET_LIGHT }
 var inventory: Array[int] = []
 var equipped := -1               # món đang trang bị (field_267[field_274]), -1 = không
 var creatures_killed := 0        # field_474, lưu vào save và hiện ở bảng thống kê
-var max_energy: int = 4          # field_152
-var energy: int = 4
+var max_energy: int = 4 * HP_PER_PIP   # máu; bản gốc field_152 = 4 nấc
+var energy: int = 4 * HP_PER_PIP
 var map_markers: Dictionary = {} # id -> true (op 4/5, field_313)
 var map_revealed: Array = []     # Vector2i (op 15)
 var log: Array = []              # {type, level, id, x, y, value}
@@ -25,9 +25,27 @@ var muffins := 0                 # field_279: bánh muffin (món 21)
 var coins := 0                   # field_281: đồng xu (món 6)
 var fuses := 0                   # field_282: cầu chì (món 14)
 var _code_pos := [0, 0]          # field_168/169: đã gõ đúng bao nhiêu số của mỗi mã thưởng
+var hero := "daniel"             # "daniel" | "clara"
+var upgrades: Dictionary = {}    # tên nâng cấp -> cấp đã mua
+var bosses_down := 0             # 1 sau SPECIAL 8 (Boss 1), 2 sau SPECIAL 12 (Boss 2)
+
+## Nâng cấp (spec hero-select-clara mục 6b): tên -> [số cấp, giá mỗi cấp, boss phải hạ trước]. Mỗi bảng tổng 18.
+const UPGRADES := {
+	"daniel": {"kindle": [2, 2, 0], "bandage": [2, 2, 0], "lamp_keeper": [2, 1, 0], "max_hp": [2, 1, 0],
+		"quick_hands": [2, 1, 0], "thick_skin": [2, 1, 0], "shadow_hunter": [2, 1, 0]},
+	"clara": {"swallow_light": [2, 2, 0], "call_shadow": [2, 2, 1], "max_hp": [2, 1, 0], "regen": [2, 1, 0],
+		"hood": [2, 1, 0], "fast_wake": [2, 1, 0], "night_eye": [2, 1, 0]},
+}
+## Chiêu/mốc mở theo boss: tên -> boss phải hạ. Không có trong bảng = có từ đầu.
+const UNLOCKS := {
+	"daniel": {"fire_wall": 1, "twin_lamp": 2},
+	"clara": {"call_shadow": 1, "one_of_them": 2},
+}
+const MAX_HP_STEPS := [100, 110, 125]
 
 const CAMERA := 7
 const BATTERY := 33
+const HP_PER_PIP := 25            # 1 nấc năng lượng gốc = 25 máu
 const NOTES := [0, 22, 23, 24, 25]   # method_160: món mới chèn trước dãy ghi chú ở cuối túi
 const NOTE_TEXT := {0: 228, 22: 229, 23: 230, 24: 232, 25: 231}   # field_272: chọn ghi chú = đọc
 # field_273: [món đang chọn, món ghép vào, kết quả (-2 = máy ảnh có flash), món mất đi (-1 = không mất)]
@@ -115,6 +133,35 @@ func count(id: int) -> int:
 		CAMERA: return battery if flash else -1
 	return -1
 
+func unlocked(name: String) -> bool:
+	return bosses_down >= int(UNLOCKS[hero].get(name, 0))
+
+func upgrade_level(name: String) -> int:
+	return int(upgrades.get(name, 0))
+
+func upgrade_points() -> int:
+	## Mỗi muffin (Clara: vòng tay, cùng món 21) = 1 điểm; trừ phần đã tiêu.
+	var spent := 0
+	for n in upgrades:
+		spent += int(upgrades[n]) * int(UPGRADES[hero][n][1])
+	return muffins - spent
+
+func can_buy(name: String) -> bool:
+	var u: Array = UPGRADES[hero].get(name, [])
+	return not u.is_empty() and upgrade_level(name) < u[0] and bosses_down >= u[2] and upgrade_points() >= u[1]
+
+func buy(name: String) -> bool:
+	## Không hoàn điểm. Máu tối đa tăng bao nhiêu thì hồi bấy nhiêu.
+	if not can_buy(name):
+		return false
+	var lv := upgrade_level(name)
+	upgrades[name] = lv + 1
+	if name == "max_hp":
+		var d: int = MAX_HP_STEPS[lv + 1] - MAX_HP_STEPS[lv]
+		max_energy += d
+		energy += d
+	return true
+
 func _recipe(a: int, b: int) -> Array:
 	for r in RECIPES:
 		if r[0] == a and r[1] == b:
@@ -180,6 +227,7 @@ func save_game(path: String, level: int, at: Vector2i) -> void:
 		"energy": energy, "max_energy": max_energy, "creatures_killed": creatures_killed, "play_ms": play_ms,
 		"steps": steps, "minigames": minigames, "battery": battery, "flash": flash, "infinite_battery": infinite_battery,
 		"grave_keys": grave_keys, "muffins": muffins, "coins": coins, "fuses": fuses,
+		"hero": hero, "upgrades": upgrades, "bosses_down": bosses_down,
 		"map_markers": map_markers.keys(), "map_revealed": map_revealed.map(func(p): return [p.x, p.y]), "log": log}
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
@@ -200,6 +248,9 @@ static func load_game(path: String) -> Dictionary:
 	w.equipped = int(d.equipped)
 	w.energy = int(d.energy)
 	w.max_energy = int(d.max_energy)
+	if w.max_energy <= 4:   # save cũ tính theo nấc
+		w.energy *= HP_PER_PIP
+		w.max_energy *= HP_PER_PIP
 	w.creatures_killed = int(d.creatures_killed)
 	w.play_ms = int(d.play_ms)
 	w.steps = int(d.get("steps", 0))
@@ -208,6 +259,13 @@ static func load_game(path: String) -> Dictionary:
 		w.set(k, int(d.get(k, 0)))
 	w.flash = bool(d.get("flash", false))
 	w.infinite_battery = bool(d.get("infinite_battery", false))
+	w.hero = "clara" if d.get("hero", "daniel") == "clara" else "daniel"
+	w.bosses_down = clampi(int(d.get("bosses_down", 0)), 0, 2)
+	var ups = d.get("upgrades", {})
+	if ups is Dictionary:
+		for n in ups:
+			if UPGRADES[w.hero].has(n):
+				w.upgrades[n] = clampi(int(ups[n]), 0, int(UPGRADES[w.hero][n][0]))
 	for k in d.map_markers:
 		w.map_markers[int(k)] = true
 	w.map_revealed = d.map_revealed.map(func(p): return Vector2i(int(p[0]), int(p[1])))

@@ -31,19 +31,22 @@ func test_op14_spawns_walking_creature() -> void:
 	eq(s.creatures[0].state, GridState.C_MOVING, "có quãng đường: đang đi")
 	eq(s.creatures[0].to, Vector2i(10, 2), "đi lên 5 ô")
 
-func test_dies_after_1s_in_light_then_vanishes() -> void:
-	var s := GridState.new(LevelData.load_level(0))
-	var run := _lit_run(s, 6)
-	ok(not run.is_empty(), "màn 0 có đoạn 7 ô sáng")
-	s.spawn_creature(run[0], run[1], 6)   # đi 6 ô x 200 ms qua toàn ô sáng
-	var rng := _rng()
-	_tick(s, 900, rng)
-	eq(s.creatures[0].state, GridState.C_MOVING, "900 ms: còn sống")
-	_tick(s, 100, rng)
-	eq(s.creatures[0].state, GridState.C_DYING, "1000 ms trong sáng: chết")
-	eq(s.world.creatures_killed, 1, "đếm số diệt")
-	_tick(s, 1000, rng)
-	eq(s.creatures[0], null, "1 s sau thì biến mất")
+func test_dies_in_light_by_shadow_hunter_level_then_vanishes() -> void:
+	for c in [[0, 2000], [1, 1750], [2, 1500]]:
+		var s := GridState.new(LevelData.load_level(0))
+		s.world.upgrades["shadow_hunter"] = c[0]
+		var run := _lit_run(s, 10)
+		ok(not run.is_empty(), "màn 0 có đoạn 11 ô sáng")
+		s.spawn_creature(run[0], run[1], 10)   # đi 10 ô x 200 ms qua toàn ô sáng
+		var rng := _rng()
+		for k in (c[1] - 50) / 50:
+			s.tick_creatures(50, rng)
+		eq(s.creatures[0].state, GridState.C_MOVING, "Thợ săn bóng cấp %d: %d ms trừ 50 còn sống" % c)
+		s.tick_creatures(50, rng)
+		eq(s.creatures[0].state, GridState.C_DYING, "Thợ săn bóng cấp %d: %d ms trong sáng thì chết" % c)
+		eq(s.world.creatures_killed, 1, "đếm số diệt")
+		_tick(s, 1000, rng)
+		eq(s.creatures[0], null, "1 s sau thì biến mất")
 
 func test_flees_to_darkest_neighbour() -> void:
 	var s := GridState.new(LevelData.load_level(0))

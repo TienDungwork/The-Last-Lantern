@@ -29,11 +29,11 @@ func test_touch_hurts_once_every_2s() -> void:
 	var rng := _rng()
 	s.player = Vector2i(5, 2)
 	s.tick_boss(100, rng)
-	eq(s.energy, s.max_energy - 1, "chạm lần đầu: -1 ngay")
+	eq(s.energy, s.max_energy - World.HP_PER_PIP, "chạm lần đầu: -1 nấc ngay")
 	_tick(s, 2000, rng)
-	eq(s.energy, s.max_energy - 1, "chưa quá 2 s: không trừ tiếp")
+	eq(s.energy, s.max_energy - World.HP_PER_PIP, "chưa quá 2 s: không trừ tiếp")
 	s.tick_boss(100, rng)
-	eq(s.energy, s.max_energy - 2, "quá 2 s: -1 nữa")
+	eq(s.energy, s.max_energy - 2 * World.HP_PER_PIP, "quá 2 s: -1 nấc nữa")
 
 func test_burns_in_light_then_special_8() -> void:
 	var s := _cornered()

@@ -182,6 +182,17 @@ func test_candle_burns_down() -> void:
 	s.step(1)
 	eq(int(s.lights[i].radius), 4, "bước 2: life 9")
 
+func test_lamp_keeper_candle_lasts_longer() -> void:
+	# Nến life 11. Cấp 1: mất 2 mỗi 3 bước; cấp 2: mất 1 mỗi 2 bước.
+	for c in [[1, 6, 7], [2, 6, 8]]:
+		var s := GridState.new(LevelData.load_level(6), Vector2i(2, 2))
+		s.world.upgrades["lamp_keeper"] = c[0]
+		var i := _light_at(s, Vector2i(2, 2))
+		s.action()
+		for k in c[1]:
+			s.step(1 if k % 2 == 0 else 3)
+		eq(int(s.lights[i].life), c[2], "Người giữ đèn cấp %d: %d bước còn life %d" % c)
+
 func test_timer_fires_after_its_ms() -> void:
 	# event#42 màn 0: hẹn giờ 1200 ms (0,0,4,176), tắt sẵn, bật bằng op 20.
 	var s := GridState.new(LevelData.load_level(0))

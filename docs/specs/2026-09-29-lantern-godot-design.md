@@ -2,6 +2,9 @@
 
 Ngày: 2026-09-29. Trạng thái: chờ duyệt.
 
+> **Đổi hướng 2026-09-30:** bỏ hai chế độ Cổ điển/Nâng cao trong menu; game một chế độ, gộp dần cơ chế mục 5 vào
+> luật chính, máu 100 thay năng lượng 4 nấc. Chi tiết ở mục M4 của `docs/plans/2026-09-29-master-plan.md`.
+
 ## 1. Mục tiêu
 
 Làm lại game trên Godot 4 với hình ảnh 2.5D, **giữ đủ 19 màn, câu đố, kịch bản và cốt truyện gốc**.
