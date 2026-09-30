@@ -19,7 +19,10 @@ func _init(state: GridState, seed_value: int = 0) -> void:
 
 func refresh_light() -> void:
 	s.light = []
-	light = s.light_map()
+	light = _light_map()
+
+func _light_map() -> Array:
+	return s.light_map()
 
 func tick(dt_ms: int) -> void:
 	if s.energy <= 0:
@@ -32,7 +35,7 @@ func tick(dt_ms: int) -> void:
 	s.tick_boss(dt_ms, rng)
 	s.tick_boss2(dt_ms, rng)
 	s.check_light_sensors()
-	light = s.light_map()   # GridState xóa bản đồ khi ô/đèn đổi; tính lại khi cần
+	light = _light_map()   # GridState xóa bản đồ khi ô/đèn đổi; tính lại khi cần
 	_drain(dt_ms)
 
 func _drain(dt_ms: int) -> void:

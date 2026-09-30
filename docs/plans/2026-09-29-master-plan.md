@@ -251,7 +251,11 @@ texture vân giấy. Cấu trúc:
 > - Máu 100 thay 4 nấc năng lượng (1 nấc gốc = 25 máu). Mất theo độ sáng ô: 0 → 10 máu/s, 1–2 → 4 máu/s,
 >   >= 3 không mất. Không hồi dần; hồi đầy ở 12 điểm cố định như bản gốc (op 3: 2 chỗ uống nước, 2 lần hạ boss;
 >   op 25: lần đầu mở cửa sau ở 8 màn). **Đã làm** (`src/core/rules_main.gd`, `tests/unit/test_rules_main.gd`).
-> - Đợt 1 (chỉ đổi luật): cường độ (xong cùng máu), bóng đổ, chập chờn.
+> - Đợt 1 (chỉ đổi luật): cường độ (xong cùng máu), bóng đổ, chập chờn. **Đã làm** (`tests/unit/test_m4_lights.gd`):
+>   bóng đổ = tia tâm đèn → tâm ô bị ô `solid` chắn thì đèn đó không chiếu tới ô; chỉ áp cho máu và hình vẽ
+>   (`RulesMain.light`), câu đố (nhặt đồ op 10, cảm biến, bàn đạp) vẫn dùng ánh sáng gốc để không kẹt màn.
+>   Chập chờn đếm theo bước đi (`world.steps`), dữ liệu `set_lights[].flicker` trong `data_enhanced/levels/NN.json`
+>   (chưa màn nào có, đặt khi chỉnh màn ở 5.3); op 100 dừng chập chờn và ép tắt/bật.
 > - Đợt 2 (phải sửa từng màn): nhiên liệu, gương, UV.
 > - Chọn nhân vật Daniel/Clara chạy trên `RulesMain` (`docs/specs/2026-09-30-hero-select-clara.md`).
 > - Mọi chỗ dưới đây nói "chế độ Nâng cao" / "chế độ Cổ điển" trong menu là hết hiệu lực; nội dung cơ chế vẫn dùng.

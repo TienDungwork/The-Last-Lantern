@@ -30,7 +30,7 @@ func pain_threshold() -> int:
 func _drain(dt_ms: int) -> void:
 	if s.world.bosses_down < 2:
 		_tick_cloak(dt_ms)
-	var lv := s.light_level(s.player)
+	var lv := player_light()
 	if lv == 0:
 		virus_ms = mini(virus_ms + dt_ms * VIRUS_UP_PER_S, VIRUS_MAX * 1000)
 	else:

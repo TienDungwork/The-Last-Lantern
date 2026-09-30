@@ -14,7 +14,7 @@ func _clara_at(lv: int) -> RulesClara:
 	for y in s.level.height:
 		for x in s.level.width:
 			var p := Vector2i(x, y)
-			if not s.is_blocked(p) and s.light_level(p) == lv:
+			if not s.is_blocked(p) and r.light[y][x] == lv:
 				s.player = p
 				return r
 	return null

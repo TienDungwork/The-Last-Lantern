@@ -14,10 +14,24 @@ const CLOAK_MONK_RANGE := 6
 var _acc := 0
 var cloak_worn_ms := 0
 var cloak_rest_ms := 0
+var _shadow_src: Array
+var _shadow: Array
+
+func _light_map() -> Array:
+	## Bóng đổ chỉ tính cho máu và hình vẽ; câu đố (nhặt đồ, cảm biến, bàn đạp) vẫn dùng ánh sáng gốc của GridState
+	## để không kẹt màn. Tính lại khi GridState xóa bản đồ gốc (ô/đèn đổi).
+	var base := s.light_map()
+	if not is_same(base, _shadow_src):
+		_shadow_src = base
+		_shadow = LightField.compute(s, true)
+	return _shadow
+
+func player_light() -> int:
+	return light[s.player.y][s.player.x] if not light.is_empty() else s.light_level(s.player)
 
 func _drain(dt_ms: int) -> void:
 	_tick_cloak(dt_ms)
-	var lv := s.light_level(s.player)
+	var lv := player_light()
 	if s.world.equipped == GridState.CLOAK or not HP_PER_S.has(lv):
 		_acc = 0
 		return

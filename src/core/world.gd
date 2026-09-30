@@ -283,7 +283,7 @@ static func load_game(path: String) -> Dictionary:
 	return {"world": w, "level": int(d.level), "at": Vector2i(int(d.x), int(d.y))}
 
 func enter_level(n: int, spawn: Vector2i = Vector2i(-1, -1)) -> GridState:
-	var s := GridState.new(LevelData.load_level(n), spawn, self)
+	var s := GridState.new(LevelData.load_level(n, true), spawn, self)
 	for c in log:
 		if int(c.level) != n:
 			continue

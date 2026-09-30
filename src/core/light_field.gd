@@ -11,8 +11,9 @@ const BLOCKED := 100
 const DIMMED := 40
 const MAX_LEVEL := 7
 
-static func compute(s: GridState) -> Array:
-	## Trả về map[y][x]; ô vật thể = 0.
+static func compute(s: GridState, hard_shadows := false) -> Array:
+	## Trả về map[y][x]; ô vật thể = 0. hard_shadows (luật chính, M4 "bóng đổ"): tia từ tâm đèn tới tâm ô bị tường/hộp
+	## chắn thì đèn đó không chiếu tới ô, dù tia góc lọt qua (bản gốc cộng 4 tia góc nên sáng lọt quanh vật cản).
 	var w := s.level.width
 	var h := s.level.height
 	var sum: Array = []
@@ -32,6 +33,9 @@ static func compute(s: GridState) -> Array:
 			for x in range(maxi(lx - r + 1, 0), mini(lx + r, w)):
 				if s.tiles[y][x] >= 8:
 					continue
+				if hard_shadows and _ray(s, (y << 1) + 1, (x << 1) + 1, (ly << 1) + 1, (lx << 1) + 1, dir, r << 1,
+						int(L.type), ly, lx, true) == BLOCKED:
+					continue
 				var acc := 0
 				for k in range(0, 16, 4):
 					var d := _ray(s, (y << 1) + c[k], (x << 1) + c[k + 1], (ly << 1) + c[k + 2], (lx << 1) + c[k + 3],
@@ -46,8 +50,9 @@ static func compute(s: GridState) -> Array:
 
 @warning_ignore("integer_division")
 static func _ray(s: GridState, ty: int, tx: int, ly: int, lx: int, dir: int, rng: int, type: int,
-		light_row: int, light_col: int) -> int:
-	## method_152(var0=ty, var1=tx, var2=ly, var3=lx, var4=dir, var5=rng, var6=type), nửa ô.
+		light_row: int, light_col: int, hard := false) -> int:
+	## method_152(var0=ty, var1=tx, var2=ly, var3=lx, var4=dir, var5=rng, var6=type), nửa ô. hard (bóng đổ): bỏ lọc
+	## theo nón đèn có hướng, mọi ô solid (cả hộp) chắn hẳn.
 	var dy := absi(ty - ly)
 	var dx := absi(tx - lx)
 	if dy > rng or dx > rng:
@@ -55,7 +60,7 @@ static func _ray(s: GridState, ty: int, tx: int, ly: int, lx: int, dir: int, rng
 	var spread := 2 if (type == 1 or type == 5) else 0
 	var sy := signi(ty - ly)
 	var sx := signi(tx - lx)
-	match dir:
+	match 0 if hard else dir:
 		1:
 			if sx == -1 or spread * dy > dx:
 				return BLOCKED
@@ -91,7 +96,7 @@ static func _ray(s: GridState, ty: int, tx: int, ly: int, lx: int, dir: int, rng
 		if t < 8:
 			continue
 		var p := LevelData.tile_props(t)
-		if int(p.blocks_light) == 1:
+		if int(p.blocks_light) == 1 or (hard and int(p.solid) == 1):
 			return BLOCKED
 		if int(p.dim_light) == 1 and absi(py - ty) <= 1 and absi(px - tx) <= 1:
 			return DIMMED

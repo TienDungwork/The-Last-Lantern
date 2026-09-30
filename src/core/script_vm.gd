@@ -134,8 +134,16 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 				L.on = 1 if int(a[2]) > 0 else 0
 				if int(a[2]) > 0:
 					L.radius = int(a[2])
+				if L.has("flicker"):
+					L.flicker.hold = false   # kịch bản đã quyết trạng thái, chập chờn không bật lại đèn bị tắt
 				st.light = []
 				st.out.append({"type": "light_changed", "light": id})
+		100:
+			var L: Dictionary = st.lights[int(a[0])]   # M4 FLICKER light on: dừng chập chờn, ép tắt/bật
+			L.erase("flicker")
+			L.on = 1 if int(a[1]) > 0 else 0
+			st.light = []
+			st.out.append({"type": "light_changed", "light": int(a[0])})
 		18:
 			if int(a[0]) != 1:           # method_209 case 18: đếm lùi, chỉ chạy tiếp khi còn 1
 				if int(a[0]) > 0:

@@ -27,8 +27,13 @@ static func read_json(path: String) -> Variant:
 	assert(v != null, "JSON hỏng: " + path)
 	return v
 
-static func load_level(n: int) -> LevelData:
+static func load_level(n: int, enhanced := false) -> LevelData:
+	## enhanced: áp data_enhanced/levels/NN.json (M4, master plan 5.1). Hiện mới đọc set_lights; test so bản gốc để false.
 	var d: Dictionary = read_json("res://data/levels/%02d.json" % n)
+	var extra := "res://data_enhanced/levels/%02d.json" % n
+	if enhanced and FileAccess.file_exists(extra):
+		for sl in read_json(extra).get("set_lights", []):
+			d.lights[int(sl.id)].merge(sl, true)
 	var L := LevelData.new()
 	L.index = n
 	L.width = int(d.width)

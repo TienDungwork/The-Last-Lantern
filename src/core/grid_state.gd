@@ -90,7 +90,7 @@ func _init(L: LevelData, spawn: Vector2i = Vector2i(-1, -1), w: World = null) ->
 				boxes[Vector2i(x, y)] = t
 				tiles[y][x] = 0
 	for l in L.lights:
-		var d: Dictionary = l.duplicate()
+		var d: Dictionary = l.duplicate(true)
 		d.life = int(l.radius) * 2 + 1   # field_228[6]: nến mất 1 mỗi bước, bán kính = life >> 1
 		lights.append(d)
 	flash_light = lights.size()   # method_140
@@ -253,6 +253,7 @@ func _step(dir: int) -> Array:
 		player = target
 		world.steps += 1   # field_139
 		out.append({"type": "moved", "to": player, "dir": dir})
+		_tick_flicker()
 		if carried >= 0:
 			_carry_light(dir)
 		for e in events_at(target, 0):
@@ -260,6 +261,25 @@ func _step(dir: int) -> Array:
 	update_plates()
 	check_light_sensors()
 	return out
+
+## M4 chập chờn: đèn có flicker {period_turns, off_turns} tắt off_turns bước đầu mỗi chu kỳ period_turns bước.
+## hold = đèn đang tắt do chập chờn; chỉ bật lại đèn mình đã tắt, không bật đèn kịch bản đã tắt trước đó.
+func _tick_flicker() -> void:
+	for i in lights.size():
+		var f = lights[i].get("flicker")
+		if f == null:
+			continue
+		var dark: bool = world.steps % int(f.period_turns) < int(f.off_turns)
+		if dark and int(lights[i].on) == 1:
+			lights[i].on = 0
+			f.hold = true
+		elif not dark and f.get("hold", false):
+			lights[i].on = 1
+			f.hold = false
+		else:
+			continue
+		light = []
+		out.append({"type": "light_changed", "light": i})
 
 func action() -> Array:
 	## method_149/143, phím bắn: đang cầm đèn thì đặt xuống; tay không thì nhặt đèn (loại 0/1/2) ở ô đang đứng và bật nó.
