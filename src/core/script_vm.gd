@@ -107,11 +107,11 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			elif not holding or (id == 29 and st.world.grave_keys < 6):
 				return false
 		12:
-			# method_209 case 12: tìm thấy minigame ẩn (câu 168) rồi vào minigame; field_428 = 0 dừng kịch bản.
-			# ponytail: chưa làm 3 minigame (method_242/247/261, ~1000 dòng), chỉ ghi nhận đã tìm để hiện ở bảng cuối game.
+			# method_209 case 12: tìm thấy minigame ẩn (câu 168), đóng thoại thì vào minigame (field_464); dừng kịch bản.
 			if not st.world.minigames.has(int(a[0])):
 				st.world.minigames.append(int(a[0]))
 			st.out.append({"type": "say", "text_id": 168, "portrait": -1})
+			st.out.append({"type": "minigame", "id": int(a[0])})
 			return false
 		13:
 			# method_209 case 13: cảnh cắt (màn giả 21) = màn đen, hình frame ở giữa phía trên, N câu thoại;
@@ -203,7 +203,8 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 				17:   # method_217 + field_121/122: bảng thống kê, mã thưởng, mã minigame đã tìm, hết game
 					var w := st.world
 					st.out.append({"type": "say", "text_id": 246, "portrait": -1, "args":
-						[w.play_time_text(), str(w.creatures_killed), str(w.steps), "0", "0", "0", w.grade()]})
+						[w.play_time_text(), str(w.creatures_killed), str(w.steps), str(w.minigame_hi[0]), str(w.minigame_hi[2]),
+						str(w.minigame_hi[1]), w.grade(w.minigame_hi[0], w.minigame_hi[2], w.minigame_hi[1])]})
 					st.out.append({"type": "say", "text_id": 245, "portrait": -1})
 					for g in [0, 1, 2]:   # 247 Darts, 248 Worm, 249 King Bong (thứ tự field_498/510/539)
 						if w.minigames.has(g):

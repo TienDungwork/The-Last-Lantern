@@ -58,6 +58,16 @@ func _initialize() -> void:
 						game.world.map_markers[int(c.args[0])] = true
 		game.menu.world = game.world
 		game.menu.open_map(game.menu._close, true)
+	if "--minigame" in args:   # --minigame 0|1|2: mở minigame, bỏ màn chào, bắt đầu chơi
+		game._say_queue.clear()
+		game.dialog.hide()
+		game._open_minigame(int(args[args.find("--minigame") + 1]))
+		var mg = game.minigame.game
+		mg.tick(0, 0)
+		mg.press("left")
+		mg.press("left")
+		if mg is Minigames.Darts:
+			mg.press("fire")
 	if "--hero" in args:   # --hero clara
 		game.world.hero = args[args.find("--hero") + 1]
 		game.skills = Skills.new(game.state)

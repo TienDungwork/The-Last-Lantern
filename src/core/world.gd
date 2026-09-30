@@ -17,6 +17,7 @@ var log: Array = []              # {type, level, id, x, y, value}
 var play_ms := 0                 # field_188, tổng thời gian chơi
 var steps := 0                   # field_139, "số mét đã đi" = số bước người chơi tự đi
 var minigames: Array = []        # op 12 đã tìm: 0 Semua Darts, 1 Lantern Worm, 2 King Bong (field_498/510/539)
+var minigame_hi := [0, 0, 0]     # điểm cao cùng thứ tự (field_504/521/542)
 var battery := 0                 # field_275: lượt flash của máy ảnh (pin, món 33)
 var flash := false               # field_277: máy ảnh đã lắp pin (ghép 7 + 33)
 var infinite_battery := false    # field_276: mã thưởng pin vô hạn
@@ -24,7 +25,7 @@ var grave_keys := 0              # field_280: mảnh chìa khóa hầm mộ (mó
 var muffins := 0                 # field_279: bánh muffin (món 21)
 var coins := 0                   # field_281: đồng xu (món 6)
 var fuses := 0                   # field_282: cầu chì (món 14)
-var _code_pos := [0, 0]          # field_168/169: đã gõ đúng bao nhiêu số của mỗi mã thưởng
+var _code_pos := [0, 0, 0, 0, 0] # field_168/169/162/163/165: đã gõ đúng bao nhiêu số của mỗi mã
 var hero := "daniel"             # "daniel" | "clara"
 var upgrades: Dictionary = {}    # tên nâng cấp -> cấp đã mua
 var bosses_down := 0             # 1 sau SPECIAL 8 (Boss 1), 2 sau SPECIAL 12 (Boss 2)
@@ -51,9 +52,11 @@ const NOTE_TEXT := {0: 228, 22: 229, 23: 230, 24: 232, 25: 231}   # field_272: c
 # field_273: [món đang chọn, món ghép vào, kết quả (-2 = máy ảnh có flash), món mất đi (-1 = không mất)]
 const RECIPES := [[9, 17, 18, 17], [17, 9, 18, 17], [17, 30, 18, 17], [19, 9, 30, 19], [9, 19, 30, 19],
 	[30, 17, 18, 17], [1, 16, 31, -1], [16, 1, 31, -1], [7, 33, -2, 33], [33, 7, -2, 33]]
-const CODES := ["7825537", "683346"]   # field_180 áo choàng tu sĩ, field_181 pin vô hạn (phím số)
+# field_180 áo choàng tu sĩ, field_181 pin vô hạn, field_174/175/177 mở minigame 0/1/2 (phím số)
+const CODES := ["7825537", "683346", "32787", "9676", "54642664"]
+const MINIGAME_CODE := 2   # type_digit trả k >= MINIGAME_CODE: mở minigame k - MINIGAME_CODE
 
-# method_218: ngưỡng xếp hạng. Điểm minigame luôn 0 (chưa làm minigame) -> mỗi trò cộng 5.
+# method_218: ngưỡng xếp hạng theo điểm cao minigame.
 const GRADE_KILLS := [200, 170, 130, 90, 50, -1]         # field_440, giết nhiều hơn -> tốt hơn
 const GRADE_STEPS := [1900, 2100, 2300, 2500, 2700, 100000]   # field_441, đi ít hơn -> tốt hơn
 const GRADE_DARTS := [45, 40, 35, 30, 25, -1]            # field_442
@@ -197,7 +200,7 @@ func type_digit(d: int) -> Array:
 			_code_pos[k] = 0
 			if k == 0:
 				add_item(GridState.CLOAK)
-			else:
+			elif k == 1:
 				battery = 99
 				infinite_battery = true
 			said.append(k)
@@ -225,7 +228,7 @@ func save_game(path: String, level: int, at: Vector2i) -> void:
 	## method_112, dạng JSON. Không dùng var_to_str/str_to_var: file do người dùng giữ, chỉ đọc dữ liệu thuần.
 	var d := {"version": 1, "level": level, "x": at.x, "y": at.y, "inventory": inventory, "equipped": equipped,
 		"energy": energy, "max_energy": max_energy, "creatures_killed": creatures_killed, "play_ms": play_ms,
-		"steps": steps, "minigames": minigames, "battery": battery, "flash": flash, "infinite_battery": infinite_battery,
+		"steps": steps, "minigames": minigames, "minigame_hi": minigame_hi, "battery": battery, "flash": flash, "infinite_battery": infinite_battery,
 		"grave_keys": grave_keys, "muffins": muffins, "coins": coins, "fuses": fuses,
 		"hero": hero, "upgrades": upgrades, "bosses_down": bosses_down,
 		"map_markers": map_markers.keys(), "map_revealed": map_revealed.map(func(p): return [p.x, p.y]), "log": log}
@@ -255,6 +258,9 @@ static func load_game(path: String) -> Dictionary:
 	w.play_ms = int(d.play_ms)
 	w.steps = int(d.get("steps", 0))
 	w.minigames = d.get("minigames", []).map(func(v): return int(v))
+	var mh = d.get("minigame_hi", [])
+	if mh is Array and mh.size() == 3:
+		w.minigame_hi = mh.map(func(v): return maxi(int(v), 0))
 	for k in ["battery", "grave_keys", "muffins", "coins", "fuses"]:
 		w.set(k, int(d.get(k, 0)))
 	w.flash = bool(d.get("flash", false))

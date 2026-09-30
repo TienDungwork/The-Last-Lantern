@@ -38,6 +38,7 @@ var rig: CameraRig
 var dialog: DialogBox
 var hud: Hud
 var menu: Menu
+var minigame: MinigameView
 var _cutscene: ColorRect        # op 13: phủ màn đen + tranh
 var music: AudioStreamPlayer
 var _beam_view := Node3D.new()    # SPECIAL 0/1/3
@@ -104,6 +105,9 @@ func _ready() -> void:
 	menu.continue_game.connect(_continue_game)
 	menu.quit_to_title.connect(_to_title)
 	menu.visibility_changed.connect(_on_menu_visibility)
+	minigame = MinigameView.new()
+	ui.add_child(minigame)
+	minigame.closed.connect(_on_minigame_closed)
 	if show_title:
 		_to_title()
 	else:
@@ -234,7 +238,7 @@ func _process(delta: float) -> void:
 			_wipe.hide()   # method_187: kín màn là tắt ngay, kịch bản chạy tiếp
 			_next_say()
 		return
-	if menu.visible or _reload_after_dialog or dialog.visible or not _pending_level.is_empty():
+	if menu.visible or minigame.visible or _reload_after_dialog or dialog.visible or not _pending_level.is_empty():
 		return
 	# Giữ phím là đi liên tục, mỗi ô đúng một nhịp ActorView.STEP_TIME (kể cả khi đâm tường,
 	# để sự kiện "repeat" không chạy mỗi khung hình).
@@ -398,7 +402,7 @@ func _set_pointer(slot: int, p) -> void:
 
 func _unhandled_input(ev: InputEvent) -> void:
 	# DialogBox (sâu hơn trong cây) nhận phím trước và đánh dấu handled khi đang mở.
-	if menu.visible or dialog.visible or not _pending_level.is_empty() or _reload_after_dialog or _fx_wait > 0.0:
+	if menu.visible or minigame.visible or dialog.visible or not _pending_level.is_empty() or _reload_after_dialog or _fx_wait > 0.0:
 		return
 	menu.world = world
 	if ev.is_action_pressed("interact"):
@@ -421,8 +425,19 @@ func _unhandled_input(ev: InputEvent) -> void:
 				hud.toast(msg)
 			_refresh_light()
 		var d := _digit(ev.physical_keycode)
-		if d >= 0 and not world.type_digit(d).is_empty():
+		if d >= 0:
+			for k in world.type_digit(d):
+				if k >= World.MINIGAME_CODE:
+					_open_minigame(k - World.MINIGAME_CODE)
 			_refresh_light()
+
+func _open_minigame(id: int) -> void:
+	_held.clear()
+	minigame.open(id, state.level.index, world.minigame_hi[id])
+
+func _on_minigame_closed(id: int, hi: int) -> void:
+	world.minigame_hi[id] = maxi(world.minigame_hi[id], hi)
+	_next_say()
 
 ## Phím số hàng trên hoặc bàn phím số -> 0..9, không phải số -> -1.
 static func _digit(k: int) -> int:
@@ -442,7 +457,7 @@ func _handle(out: Array) -> void:
 				actor.face(o.dir)
 			"teleported":
 				actor.snap_to(o.to)
-			"say", "pointer", "cutscene", "cutscene_end", "game_end", "wipe", "pose":   # áp đúng lúc giữa các câu thoại (kịch bản dừng ở mỗi câu)
+			"say", "pointer", "cutscene", "cutscene_end", "game_end", "wipe", "pose", "minigame":   # áp đúng lúc giữa các câu thoại (kịch bản dừng ở mỗi câu)
 				_say_queue.append(o)
 			"box_moved":
 				builder.move_box(o.from, o.to)
@@ -478,6 +493,9 @@ func _next_say() -> void:
 					return
 			"game_end":
 				_to_title()
+				return
+			"minigame":
+				_open_minigame(p.id)
 				return
 	if _say_queue.is_empty():
 		if _reload_after_dialog:   # class_4 case 11: chết = nạp lại bản tự lưu gần nhất (method_114)

@@ -58,7 +58,10 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
    - Op 1 = đổi track (`class_4` case 21); nhạc mỗi màn `field_38`, tiêu đề = track 4. MIDI gốc cb..ch tổng hợp ra WAV
      bằng `tools/midi_to_wav.py` (không có fluidsynth).
    - Op 13 = cảnh cắt (màn giả 21): tranh frame 181..188 + N câu, xong chạy tiếp màn cũ (không nạp lại).
-   - Op 12 = tìm thấy minigame ẩn (câu 168, dừng kịch bản). **Chưa làm 3 minigame** (method_242/247/261), chỉ ghi nhận.
+   - Op 12 = tìm thấy minigame ẩn (câu 168, dừng kịch bản), đóng thoại thì vào minigame. ~~3 minigame~~ xong
+     (`src/core/minigames.gd`, `src/ui/minigame_view.gd`, test `test_minigames.gd`): Semua Darts (màn 0), Lantern Worm
+     (màn 3, màn sinh từ seed = số màn bằng LCG Java), King Bong (màn 8, máy khôn hơn ở màn 8). Mã số 32787 / 9676 /
+     54642664 mở lại từ trong game. Điểm cao lưu trong save, dùng cho bảng thống kê và hạng.
    - SPECIAL 17 = bảng thống kê (câu 246, hạng A–F `method_218`) + 245 + 247..249, rồi về tiêu đề.
    - SPECIAL 0/1/3/4 = câu đố tượng màn 2 (2 tia nắng mới ghép được chìa). ~~Hình ảnh 7/15/16/13/14/5/6/9~~ xong.
    - **Op 8 với người chơi = ép đi từng ô** (`field_141`), sự kiện ô đi qua vẫn chạy; trước đây dịch tức thì làm kẹt
