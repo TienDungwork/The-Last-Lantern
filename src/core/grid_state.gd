@@ -29,6 +29,7 @@ const BOSS_SIGHT := 10               # nửa ô (= 5 ô)
 const BOSS2_TILE := 4096             # method_199 tính bằng pixel<<8: 1 ô = 16 px
 const BOSS2_LAMP_DAMAGE := 6400      # 4 đèn là hết máu
 const FIREBALL_SLOTS := 3            # field_403
+const FLASH_MS := 1500               # field_160: flash máy ảnh sáng chừng này ms, trong lúc đó không đi được
 
 var level: LevelData
 var world: World
@@ -57,6 +58,8 @@ var pointers: Dictionary = {}    # op 27, slot -> {at, dir} (mũi tên) | {hud} 
 var forced: Dictionary = {}      # op 8: {dir, n} còn phải ép đi; trong lúc này bỏ qua phím
 var sun_beam: Dictionary = {}    # SPECIAL 0/1/3 (field_334/335/336): {n: số tia 1|2, at: ô gốc}; mất khi vào màn
 var dog := {"at": Vector2i.ZERO, "visible": false, "pose": 0, "sleep": false}   # SPECIAL 5/6/9 (field_343..349), màn 15
+var flash_ms := 0                # field_160, ms flash còn lại
+var flash_light := -1            # field_161: đèn phụ cuối danh sách (loại 3, bán kính 6) dùng cho flash
 var light: Array = []            # độ sáng từng ô; rỗng = cần tính lại (light_map())
 var player: Vector2i
 var facing: int = 2
@@ -88,6 +91,8 @@ func _init(L: LevelData, spawn: Vector2i = Vector2i(-1, -1), w: World = null) ->
 		var d: Dictionary = l.duplicate()
 		d.life = int(l.radius) * 2 + 1   # field_228[6]: nến mất 1 mỗi bước, bán kính = life >> 1
 		lights.append(d)
+	flash_light = lights.size()   # method_140
+	lights.append({"x": 0, "y": 0, "type": 3, "on": 0, "radius": 6, "dir": 0, "life": 13})
 	events = L.events.duplicate(true)
 	for e in events:
 		event_active.append(bool(int(e.flags) & F_ACTIVE))
@@ -188,7 +193,7 @@ func enter() -> Array:
 func step(dir: int) -> Array:
 	## Một lượt đi. Bị chắn: chạy sự kiện ô đích có lọc hướng. Đi được: chạy sự kiện ô mới, không lọc hướng.
 	out.clear()
-	if not control or not forced.is_empty():
+	if not control or not forced.is_empty() or flash_ms > 0:
 		return out
 	return _step(dir)
 
@@ -251,7 +256,14 @@ func _step(dir: int) -> Array:
 
 func action() -> Array:
 	## method_149/143, phím bắn: đang cầm đèn thì đặt xuống; tay không thì nhặt đèn (loại 0/1/2) ở ô đang đứng và bật nó.
+	## Cầm máy ảnh đã lắp pin: chụp flash (hết pin thì không làm gì).
 	out.clear()
+	if world.equipped == World.CAMERA and world.flash:
+		if world.battery > 0 and flash_ms == 0:
+			if not world.infinite_battery:
+				world.battery -= 1
+			_set_flash(true)
+		return out
 	if carried >= 0:
 		carried = -1
 		return out
@@ -264,6 +276,26 @@ func action() -> Array:
 				light = []
 	check_light_sensors()
 	return out
+
+func _set_flash(on: bool) -> void:
+	## method_88: bật đèn flash ở ô người chơi rồi chạy lại mọi sự kiện ở ô đó (nhặt được đồ trong tối); hết giờ thì tắt.
+	var L: Dictionary = lights[flash_light]
+	L.on = 1 if on else 0
+	L.x = player.x
+	L.y = player.y
+	light = []
+	flash_ms = FLASH_MS if on else 0
+	out.append({"type": "light_changed", "light": flash_light})
+	if on:
+		for e in events_at(player, 0):
+			vm.run(e)
+	check_light_sensors()
+
+func tick_flash(ms: int) -> void:
+	if flash_ms > 0:
+		flash_ms -= ms
+		if flash_ms <= 0:
+			_set_flash(false)
 
 func _press_switch(p: Vector2i) -> void:
 	## method_92: công tắc tường khung 63 (ngang) / 52 (dọc) bật-tắt đèn loại 5 ở ô trái-phải / dưới-trên,

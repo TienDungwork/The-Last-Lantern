@@ -62,10 +62,17 @@ func test_if_holding_aborts() -> void:
 	eq(s.out.size(), 0, "không cầm item 3 thì dừng, không SAY")
 	s.inventory.append(3)
 	s.vm.run(cmds)
+	eq(s.out.size(), 0, "có trong túi nhưng không cầm trên tay: vẫn dừng")
+	s.world.equipped = 3
+	s.vm.run(cmds)
 	eq(s.out.size(), 1, "cầm rồi thì chạy tiếp")
 	s.out.clear()
 	s.vm.run({"commands": [{"op": 11, "args": [3 | 0x80]}, {"op": 2, "args": [10, 255, 255]}]})
 	eq(s.out.size(), 0, "IF_NOT_HOLDING khi đang cầm thì dừng")
+	s.world.add_item(29)
+	s.world.equipped = 29
+	s.vm.run({"commands": [{"op": 11, "args": [29]}, {"op": 2, "args": [10, 255, 255]}]})
+	eq(s.out.size(), 0, "cầm mảnh chìa hầm mộ nhưng chưa đủ 6: dừng")
 
 func test_set_tile_and_light() -> void:
 	var s := GridState.new(LevelData.load_level(0))

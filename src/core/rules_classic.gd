@@ -25,6 +25,7 @@ func tick(dt_ms: int) -> void:
 	if s.energy <= 0:
 		return   # đã chết, chờ game.gd nạp lại màn
 	s.tick_timers(dt_ms)
+	s.tick_flash(dt_ms)
 	s.tick_guards(dt_ms)
 	s.tick_creatures(dt_ms, rng)
 	s.tick_boss(dt_ms, rng)

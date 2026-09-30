@@ -10,6 +10,10 @@ signal quit_to_title
 const SETTINGS_PATH := "user://settings.cfg"
 const FRAME := Color(0.72, 0.53, 0.28)
 const LANGS := {"vi": "Tiếng Việt", "en": "English"}
+const MAP_ITEM := 3
+const MAP_CELL := 12   # px mỗi ô bản đồ (bản gốc 4)
+const MAP_COLORS := [Color8(0xE7, 0xE6, 0xCF), Color8(0xB7, 0xB8, 0xB7), Color8(0x82, 0x80, 0x59)]   # method_176
+const MAP_LEGEND := [379, 381, 382, 377, 380, 378, 383]   # method_174, cùng thứ tự câu 129..135
 
 var has_save := false
 var in_game := false          # false = đang ở màn tiêu đề
@@ -18,6 +22,7 @@ var lang := "vi"
 var music_volume := 0.8
 var _page: Control
 var _back: Callable = Callable()
+var _combine := -1            # field_287/288: món đang chờ ghép, -1 = không
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -106,9 +111,81 @@ func _toggle_lang(btn: Button) -> void:
 	btn.text = LANGS[lang]
 	_apply_settings()
 
+## Dòng 4270: đang ghép thì món vừa chọn là món thứ hai; ghi chú = đọc; bản đồ = mở bản đồ;
+## món có công thức = cầm lên và chờ chọn món ghép.
 func _toggle_equip(id: int, back: Callable) -> void:
+	if _combine >= 0:
+		var first := _combine
+		_combine = -1
+		if id == first or world.combine(first, id):
+			open_inventory(back)
+			return
+	if World.NOTE_TEXT.has(id):
+		open_note(id, back)
+		return
 	world.equipped = -1 if world.equipped == id else id
+	if world.equipped == MAP_ITEM:   # method_169: chọn bản đồ trong túi đồ -> mở màn 19 (bản đồ)
+		open_map(back)
+		return
+	if world.equipped == id and world.can_combine(id):
+		_combine = id
 	open_inventory(back)
+
+func open_note(id: int, back: Callable) -> void:
+	var box := _panel(LevelData.text(int(LevelData.item(id).name_id), lang))
+	var l := Label.new()
+	l.text = LevelData.text(World.NOTE_TEXT[id], lang)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(680, 0)
+	l.add_theme_font_size_override("font_size", 20)
+	box.add_child(l)
+	box.add_child(_button("Đóng", open_inventory.bind(back)))
+	_show(box.get_parent(), open_inventory.bind(back))
+
+## method_176: ô 4 px ba màu, điểm đánh dấu (op 4/5) vẽ đè, cửa khóa (377) vẽ sau cùng. Enter = chú giải (method_174).
+func open_map(back: Callable, legend := false) -> void:
+	var box := _panel(LevelData.text(181, lang))
+	var cells := world.map_cells()
+	var img := Image.create(cells[0].size(), cells.size(), false, Image.FORMAT_RGB8)
+	for y in cells.size():
+		for x in cells[y].size():
+			img.set_pixel(x, y, MAP_COLORS[cells[y][x]])
+	var map := TextureRect.new()
+	map.texture = ImageTexture.create_from_image(img)
+	map.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	map.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	map.custom_minimum_size = img.get_size() * MAP_CELL
+	var markers: Array = LevelData.read_json("res://data/map_markers.json")
+	var ids: Array = world.map_markers.keys().filter(func(i): return i < markers.size())
+	ids.sort_custom(func(a, b): return int(markers[a].icon_frame != 377) > int(markers[b].icon_frame != 377))
+	for i in ids:
+		var m: Dictionary = markers[i]
+		var ic := Hud.icon(int(m.icon_frame), MAP_CELL / 4)
+		map.add_child(ic)
+		ic.position = (Vector2(int(m.x), int(m.y)) + Vector2(0.5, 0.5)) * MAP_CELL - ic.custom_minimum_size / 2
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override("separation", 20)
+	body.add_child(map)
+	box.add_child(body)
+	if legend:
+		var keys := VBoxContainer.new()
+		keys.alignment = BoxContainer.ALIGNMENT_CENTER
+		for k in MAP_LEGEND.size():
+			keys.add_child(_row_icon(MAP_LEGEND[k], LevelData.text(129 + k, lang)))
+		body.add_child(keys)
+	box.add_child(_button("Ẩn chú giải" if legend else "Chú giải", open_map.bind(back, not legend)))
+	box.add_child(_button("Đóng", back))
+	_show(box.get_parent(), back)
+
+func _row_icon(frame: int, text: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.add_child(Hud.icon(frame, 3))
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 18)
+	row.add_child(l)
+	return row
 
 func open_inventory(back: Callable) -> void:
 	var box := _panel("TÚI ĐỒ")
@@ -135,9 +212,20 @@ func open_inventory(back: Callable) -> void:
 			b.add_theme_stylebox_override("normal", _box(Color(0.25, 0.17, 0.08), Color(1, 0.82, 0.35), 4))
 		var item_name := LevelData.text(int(it.name_id), lang)
 		var hint := "  (đang dùng — Enter để cất)" if id == world.equipped else "  — Enter để dùng"
+		if World.NOTE_TEXT.has(id):
+			hint = "  — Enter để đọc"
+		if _combine >= 0:
+			hint = "  — Enter để ghép với %s" % LevelData.text(int(LevelData.item(_combine).name_id), lang)
 		b.focus_entered.connect(func(): info.text = item_name + hint)
 		b.mouse_entered.connect(b.grab_focus)
 		b.pressed.connect(_toggle_equip.bind(id, back))
+		var n := world.count(id)
+		if n >= 0:
+			var c := Label.new()
+			c.text = str(n) + ("/6" if id == 29 else "")
+			c.add_theme_font_size_override("font_size", 18)
+			c.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 4)
+			b.add_child(c)
 		grid.add_child(b)
 	box.add_child(_button("Đóng", back))
 	_show(box.get_parent(), back)
@@ -213,6 +301,7 @@ func _show(page: Control, back: Callable) -> void:
 		first[0].grab_focus.call_deferred()
 
 func _close() -> void:
+	_combine = -1
 	if _page:
 		_page.queue_free()
 		_page = null

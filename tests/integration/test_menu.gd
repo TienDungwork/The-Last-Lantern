@@ -27,6 +27,28 @@ func test_title_new_game_inventory_pause() -> void:
 	eq(game.world.equipped, 20, "chọn món: trang bị")
 	game.menu._toggle_equip(20, game.menu._close)
 	eq(game.world.equipped, -1, "chọn lại: cất")
+	game.world.inventory.append(Menu.MAP_ITEM)
+	game.world.map_markers = {0: true}
+	game.menu._toggle_equip(Menu.MAP_ITEM, game.menu._close)
+	var maps: Array = game.menu._page.find_children("*", "TextureRect", true, false)
+	eq(maps.size(), 2, "chọn bản đồ: mở trang bản đồ (nền + 1 điểm đánh dấu)")
+	game.menu.open_map(game.menu._close, true)
+	eq(game.menu._page.find_children("*", "TextureRect", true, false).size(), 2 + Menu.MAP_LEGEND.size(), "chú giải")
+	game.world.equipped = -1
+	game.world.add_item(29)
+	game.world.add_item(0)
+	game.menu.open_inventory(game.menu._close)
+	ok(game.menu._page.find_children("*", "Label", true, false).any(func(l): return l.text == "1/6"), "số mảnh chìa")
+	game.menu._toggle_equip(0, game.menu._close)
+	ok(game.menu._page.find_children("*", "Label", true, false).any(
+		func(l): return l.text == LevelData.text(228, game.menu.lang)), "chọn ghi chú: đọc")
+	game.world.add_item(9)
+	game.world.add_item(17)
+	game.menu._toggle_equip(9, game.menu._close)
+	eq(game.menu._combine, 9, "chọn xà phòng: chờ ghép")
+	game.menu._toggle_equip(17, game.menu._close)
+	eq([game.world.equipped, game.menu._combine], [18, -1], "ghép ra huy hiệu sáng")
+	game.world.equipped = -1
 	game.menu._close()
 
 	game.dialog.hide()

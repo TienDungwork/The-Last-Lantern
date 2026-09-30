@@ -60,12 +60,19 @@ Nhánh: `m2`. Nguyên tắc như M1: logic trong `src/core` (không node), test 
    - Op 13 = cảnh cắt (màn giả 21): tranh frame 181..188 + N câu, xong chạy tiếp màn cũ (không nạp lại).
    - Op 12 = tìm thấy minigame ẩn (câu 168, dừng kịch bản). **Chưa làm 3 minigame** (method_242/247/261), chỉ ghi nhận.
    - SPECIAL 17 = bảng thống kê (câu 246, hạng A–F `method_218`) + 245 + 247..249, rồi về tiêu đề.
-   - SPECIAL 0/1/3/4 = câu đố tượng màn 2 (2 tia nắng mới ghép được chìa). Còn lại chỉ là hình ảnh, chưa làm:
-     7 xóa màn 7x7, 15/16 hoạt ảnh nằm/dậy, 13 frame 129 tĩnh, 14 đèn chớp, 5/6/9 con chó màn 15.
+   - SPECIAL 0/1/3/4 = câu đố tượng màn 2 (2 tia nắng mới ghép được chìa). ~~Hình ảnh 7/15/16/13/14/5/6/9~~ xong.
    - **Op 8 với người chơi = ép đi từng ô** (`field_141`), sự kiện ô đi qua vẫn chạy; trước đây dịch tức thì làm kẹt
      đoạn mở đầu. **Trò chơi mới = màn 16** (`class_4` case 14), tự đi rồi dịch chuyển sang màn 0 (6,4).
    - `test_levels_smoke.gd`: đích dịch chuyển của 19 màn hợp lệ, chạy mọi sự kiện không lỗi.
-5. Bản đồ thành phố, ~~menu~~, ~~lưu game~~. Lưu: JSON `user://save.json` (`World.save_game/load_game`), tự lưu
+5. ~~Bản đồ thành phố~~, ~~menu~~, ~~lưu game~~. Bản đồ (`method_176`): chọn món 3 trong túi đồ hoặc phím M; ô đường
+   tô loang từ điểm op 15 (`World.map_cells`), điểm op 4/5 vẽ đè, chú giải frame 379..383 + câu 129..135. Lưu: JSON `user://save.json` (`World.save_game/load_game`), tự lưu
    khi vào màn 14, khi TELEPORT lúc đang ở màn 14 và SPECIAL 18. Menu (`src/ui/menu.gd`): tiêu đề (Chơi tiếp dùng
    save), tạm dừng Esc, cài đặt, túi đồ lưới Tab/I để trang bị. Op 27 (mũi tên/nháy HUD) xong.
-6. Parity route cho mỗi màn (`tools/record_parity.ps1`), kèm một route qua bàn đạp.
+6. ~~Túi đồ gốc~~ (`method_160/161`, `field_272/273`) — trước đây thiếu, làm kẹt truyện ở màn 10/11/14:
+   - **Op 11 so với món đang cầm** (`field_267[field_274]`), không phải túi; cầm mảnh chìa 29 cần đủ 6 mảnh.
+   - Cộng dồn: muffin 21 (đủ 18 -> câu 244), cầu chì 14, mảnh chìa 29 (đủ 6 -> câu 233), xu 6, pin 33. Op 19 bớt xu/cầu chì.
+   - Ghép (`World.RECIPES`): xà phòng + huy hiệu bẩn -> huy hiệu sáng, xô + xà phòng -> xô xà phòng, nam châm + dây,
+     máy ảnh + pin -> flash. Ghi chú 0/22..25 chọn là đọc (câu 228..232).
+   - Flash máy ảnh (`method_149/88`): đèn phụ loại 3 bán kính 6 ở chỗ đứng 1500 ms, khóa đi, chạy lại mọi sự kiện ở ô
+     (nhặt được đồ trong tối). Không màn nào cho pin: chỉ có qua mã 683346 (muffin thứ 18). Mã 7825537 = áo choàng.
+7. Parity route cho mỗi màn (`tools/record_parity.ps1`), kèm một route qua bàn đạp.

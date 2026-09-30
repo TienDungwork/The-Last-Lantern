@@ -48,6 +48,16 @@ func _initialize() -> void:
 		var ev: Array = game.state.out.duplicate()
 		game.state.out.clear()
 		game._handle(ev)
+	if "--map" in args:   # --map: trang bản đồ + chú giải, mở mọi ô op 15 và bật mọi điểm op 4 có trong 19 màn
+		for n in 19:
+			for e in LevelData.load_level(n).events:
+				for c in e.commands:
+					if int(c.op) == 15:
+						game.world.map_revealed.append(Vector2i(int(c.args[0]), int(c.args[1])))
+					elif int(c.op) == 4:
+						game.world.map_markers[int(c.args[0])] = true
+		game.menu.world = game.world
+		game.menu.open_map(game.menu._close, true)
 	for i in frames:
 		await process_frame
 	var path := ProjectSettings.globalize_path("res://").path_join(out)

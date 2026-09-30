@@ -95,11 +95,16 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 			if int(a[0]) != 255:
 				var it := LevelData.item(int(a[0]))
 				st.out.append({"type": "say", "text_id": 238, "portrait": int(it.frame), "args": [int(it.name_id)]})
-				st.inventory.append(int(a[0]))
+				for t in st.world.add_item(int(a[0])):
+					st.out.append({"type": "say", "text_id": t, "portrait": -1})
 				st.out.append({"type": "pickup", "item": int(a[0])})
-		11:
-			var want_not := (int(a[0]) & 0x80) != 0
-			if st.inventory.has(int(a[0]) & 0x7F) == want_not:
+		11:   # method_209 case 11: so với món đang cầm (không phải túi); mảnh chìa 29 cần đủ 6
+			var id := int(a[0]) & 0x7F
+			var holding := st.world.equipped == id
+			if int(a[0]) & 0x80:
+				if holding:
+					return false
+			elif not holding or (id == 29 and st.world.grave_keys < 6):
 				return false
 		12:
 			# method_209 case 12: tìm thấy minigame ẩn (câu 168) rồi vào minigame; field_428 = 0 dừng kịch bản.
@@ -116,7 +121,8 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 				st.out.append({"type": "say", "text_id": int(a[3 + i]), "portrait": -1})
 			st.out.append({"type": "cutscene_end"})
 		15:
-			st.world.map_revealed.append(Vector2i(int(a[0]), int(a[1])))
+			if not st.world.map_revealed.has(Vector2i(int(a[0]), int(a[1]))):   # method_172: bỏ điểm trùng
+				st.world.map_revealed.append(Vector2i(int(a[0]), int(a[1])))
 			st.out.append({"type": "map_reveal", "at": Vector2i(int(a[0]), int(a[1]))})
 		16, 24, 28:
 			pass   # bàn đạp / hẹn giờ / cảm biến sáng: GridState kích hoạt, lệnh đầu tự nó không làm gì
@@ -136,9 +142,7 @@ func _exec(e: Dictionary, op: int, a: Array, actor: int = -1) -> bool:
 				return false
 			a[0] = 0
 		19:
-			st.inventory.erase(int(a[0]))
-			if st.world.equipped == int(a[0]) and not st.inventory.has(int(a[0])):
-				st.world.equipped = -1
+			st.world.remove_item(int(a[0]))
 			st.out.append({"type": "take_item", "item": int(a[0])})
 		20:
 			if _level_arg(int(a[1]), World.ENABLE, int(a[0])):

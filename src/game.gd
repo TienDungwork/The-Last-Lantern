@@ -135,6 +135,8 @@ func _continue_game() -> void:
 
 func _on_menu_visibility() -> void:
 	if not menu.visible and state != null:
+		if world.equipped == World.CAMERA:   # method_169: cầm máy ảnh thì buông đèn (phím bắn dành cho flash)
+			state.carried = -1
 		_refresh_light()
 	if not menu.visible and _menu_in_game:   # field_434: đóng menu trong game -> chạy lại sự kiện cờ 128 ở ô đang đứng
 		_menu_in_game = false
@@ -378,6 +380,21 @@ func _unhandled_input(ev: InputEvent) -> void:
 	elif ev.is_action_pressed("inventory"):
 		_menu_in_game = true
 		menu.open_inventory(menu._close)
+	elif ev.is_action_pressed("map") and world.inventory.has(Menu.MAP_ITEM):
+		_menu_in_game = true
+		menu.open_map(menu._close)
+	elif ev is InputEventKey and ev.pressed and not ev.echo:
+		var d := _digit(ev.physical_keycode)
+		if d >= 0 and not world.type_digit(d).is_empty():
+			_refresh_light()
+
+## Phím số hàng trên hoặc bàn phím số -> 0..9, không phải số -> -1.
+static func _digit(k: int) -> int:
+	if k >= KEY_0 and k <= KEY_9:
+		return k - KEY_0
+	if k >= KEY_KP_0 and k <= KEY_KP_9:
+		return k - KEY_KP_0
+	return -1
 
 func _handle(out: Array) -> void:
 	for o in out:
